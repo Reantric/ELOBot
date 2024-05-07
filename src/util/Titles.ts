@@ -4,7 +4,7 @@ export default class Titles {
 
     static Title: [string,ColorResolvable, number[],string][] = [
         ["Puritan",Colors.Grey,[0,999],""],
-        ["Seasoned",Colors.Green,[1000,1399],""],
+        ["Grassman",Colors.Green,[1000,1399],""],
         ["Unhinged",Colors.Aqua,[1400,1799],""],
         ["Expert",Colors.Blue,[1800,1999],""],
         ["Candidate Master",Colors.Purple,[2000,2199],"CM"],

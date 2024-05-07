@@ -51,7 +51,7 @@ let events: IBotEvent[] = [];
 let reacts: IBotReact[] = [];
 const command_cooldowns: any = new Collection();
 
-function randint(min: number,max: number) {
+export function randint(min: number,max: number) {
     return Math.floor(Math.random()*(max-min+1)+min);
 }
 
@@ -265,50 +265,15 @@ async function loadCommands(commandsPath: string, allSlashCommands: Collection<S
     if (!setupInfo.commands || (setupInfo.commands as string[]).length == 0) return;
     let commandDatas: any[] = [];
     for (const commandName of setupInfo.commands as string[]) {
-        //const commandsClass = require(`${commandsPath}/${commandName}`).default;
+        // Import the command classes dynamically
         const commandsClass = (await import(`${commandsPath}/${commandName}`)).default;
         const command = new commandsClass() as IBotInteraction;
-        helpUtil.add(command.name(),command.help(),command.perms());
+        helpUtil.add(command.name(), command.help(), command.perms());
+
         commands.push(command);
-        commandDatas.push(command.data().toJSON())
-        const permCommand = allSlashCommands.find((com) => com.name == command.name());
-        let xd: string;
-        let complementxd: string;
-        switch (command.perms()) {
-            case 'user':
-                xd = studentID
-                complementxd = teacherID;
-                break;
-            case 'admin':
-                xd = teacherID
-                complementxd = studentID;
-                break;
-            default:
-                xd = ''
-                complementxd = ''
-        }
-        //console.log(xd,command.name(), command.perms());
-        if (xd != ''){
-            const permissions: ApplicationCommandPermissions[] = [
-                {
-                    id: xd,
-                    type: ApplicationCommandPermissionType.Role,
-                    permission: true,
-                },
-                {
-                    id: complementxd,
-                    type: ApplicationCommandPermissionType.Role,
-                    permission: false,
-                },
-            ];
-
-            permCommand?.permissions.add({
-                permissions,
-                token: process.env.TOKEN!
-            });
-
-        }
+        commandDatas.push(command.data().toJSON());
     }
+    
 
     const rest: REST = new REST({ version: '10' }).setToken(process.env.TOKEN!);
     
@@ -316,10 +281,9 @@ async function loadCommands(commandsPath: string, allSlashCommands: Collection<S
         console.log("Attempting")
         try {
             console.log('Started refreshing application (/) commands.');
-            console.log(process.env.TOKEN)
             await rest.put(
                 Routes.applicationGuildCommands(process.env.CLIENT_ID!, setupInfo.guildID),
-                { body: commandDatas },
+                { body: commandDatas},
             );
 
             console.log('Successfully reloaded application (/) commands.');
@@ -354,7 +318,7 @@ async function loadReacts(commandsPath: string){
 Bot.login(`ODg1NTQyNDY4NjkzNjc2MDU0.GCCzlP.ZFRi5739pKJU6fxWJldk08JMP_cptZ4zB3Qm5E`);
 
 async function initIntelligentAgents(){
-    db.has("Roger").then((a: any) => {
+    /*db.has("Roger").then((a: any) => {
         if (!a){
             db.set("Roger", botProfile(1200))
         }
@@ -363,7 +327,7 @@ async function initIntelligentAgents(){
         if (!a){
             db.set("Hue", botProfile(2100))
         }
-    });
+    }); */
 
     db.has("Ou").then((a: any) => {
         if (!a){

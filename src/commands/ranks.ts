@@ -38,7 +38,7 @@ export default class ranks implements IBotInteraction {
         embed.setTitle(`All ranks!`)
         .setColor(Colors.LuminousVividPink); // add colors
         
-        for (var i = Titles.Title.length; i >= 0; i--){
+        for (var i = Titles.Title.length-1; i >= 0; i--){
             embed.addFields({
                 name: Titles.Title[i][0],
                 value: `**[${Titles.Title[i][2][0]},${Titles.Title[i][2][1]}]**`,

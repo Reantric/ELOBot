@@ -28,11 +28,11 @@ export default class add implements IBotInteraction {
     .setName(this.name())
     .setDescription(this.help())
     .addIntegerOption((option:any) => 
-        option.setName('skulls')
+        option.setName('rating')
             .setDescription('How many Lintys are you bestowing upon?')
             .setRequired(true))
     .addUserOption((option: any) => option.setName('target').setDescription('Select a person to smite.').setRequired(false))
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
+   // .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 }
     perms(): "admin" | "user" | "both" {
         return 'both';

@@ -4,7 +4,7 @@ import { IBotInteraction } from "../api/capi";
 import { SlashCommandBuilder } from '@discordjs/builders';
 import { QuickDB } from "quick.db";
 const db = new QuickDB();
-import Titles from "../util/Titles";
+import Titles from "../util/Titles.js";
 
 export default class lintpinger implements IBotInteraction {
 
@@ -27,9 +27,10 @@ export default class lintpinger implements IBotInteraction {
         return new SlashCommandBuilder()
     .setName(this.name())
     .setDescription(this.help())
+    .setDefaultMemberPermissions(0);
 }
     perms(): "admin" | "user" | "both" {
-        return 'both';
+        return "admin";
     }
 
     async runCommand(interaction: CommandInteraction, Bot: Client): Promise<void> {
@@ -44,7 +45,7 @@ export default class lintpinger implements IBotInteraction {
 
     async pingRandomChannel(Bot: Client) {
         try {
-            // Reeshav retrieves the guild by its ID
+            // hmm retrieves the guild by its ID
             const guild = await Bot.guilds.fetch('');
             if (!guild) return;
 
