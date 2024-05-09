@@ -16,6 +16,10 @@ import { randint } from "../index.js";
 // @ts-ignore
 import * as glicko2 from "glicko2";
 var history = db.table('history');
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { readFileSync } from "fs";
+const genAI = new GoogleGenerativeAI("AIzaSyBv0y1ri9woqXzPouncQWZiH8fbxgGJZQo");
+
 let Renderer = new rr()
 
 export default class prob implements IBotInteraction {
@@ -28,9 +32,10 @@ export default class prob implements IBotInteraction {
         return "prob";
     }   
     
-    cooldown(): number{
-        return 5;
+    cooldown(): number {
+        return 25;
     }
+
     isThisInteraction(command: string): boolean {
         return command === "prob";
     }
@@ -39,7 +44,8 @@ export default class prob implements IBotInteraction {
         return new SlashCommandBuilder()
     .setName(this.name())
     .setDescription(this.help())
-}
+    }
+
     perms(): "admin" | "user" | "both" {
         return 'both';
     }
@@ -213,11 +219,26 @@ export default class prob implements IBotInteraction {
 
     async runCommand(interaction: ChatInputCommandInteraction, Bot: Client): Promise<void> {
         const hi: any[] = await randProb() as any[];
+        await interaction.deferReply();
+        
         let probStatement = hi[0];
         let probAnswer = hi[1];
         let answer = hi[2];
+        let rating = hi[3];
+        let probYear = hi[4];
+        let hint = "N/A";
+        try {
+            probStatement = await this.fixLaTeX(hi[0]);
+            hint = await this.getHint(probStatement,probAnswer);
+        } catch (e) {
+            console.log(e);
+        }
+        console.log(`The hint: ${hint}`);
+        console.log(probStatement)
+       
+        
 
-        await interaction.deferReply();
+        
 
         const skipButton = new ButtonBuilder()
         .setCustomId('skip_problem')
@@ -272,13 +293,12 @@ export default class prob implements IBotInteraction {
         const a = stuff[0];
         
         // set color based on rating
-        let rating = randint(200,2600); // Placeholder For now!?
 
         const skinnyEmbed = new EmbedBuilder()
     .addFields(
-        { name: 'Rating', value: `||${rating}||`, inline: true },
-        { name: 'Hint', value: `|| idk man i'll figure this out later ||`, inline: true }
-    ).setColor(Titles.getTitle(rating)[1]);
+        { name: 'Rating', value: `||${Math.round(rating)}||`, inline: true },
+        { name: 'Hint', value: `|| ${hint} ||`, inline: true }
+    ).setColor(Titles.getTitle(rating)[1]).setFooter({ text: `Year: ${probYear}` });
 
 
 
@@ -336,21 +356,24 @@ export default class prob implements IBotInteraction {
 
         collector.on('end', async (collected,reason) => {
             console.log(`Collected ${collected.size} interactions.`);
-
-            if (reason === 'skipped') {
+            let isSkip = false;
+            if (reason === 'skipped') { // make sure user cant get wrong then skip to avoid Rating Loss
                 await msgToHold.edit({
                     content: "You've opted to skip the problem.",
                     components: []
                 });
-                return;
-            }
+                isSkip = true;
+            } else {
 
-            await msgToHold.edit({
-                content: "IT'S OVER, YOU HUE!?"
-            });
+                await msgToHold.edit({
+                    content: "IT'S OVER, YOU HUE!?"
+                });
+            }
 
             let result = 0;
             if (tryCount == 1){
+                if (isSkip)
+                    return;
                 interaction.channel?.send("Nice, you got it right. I will remember this.");
                 result = 1;
             } else {
@@ -385,6 +408,82 @@ console.log("Ryan new volatility: " + p1.getVol());  */
         await db.set(`${userW!.id}.vol`,p1.getVol());
         history.push(userW.id,p1.getRating());
     }
+
+    
+
+// Access your API key as an environment variable (see "Set up your API key" above)
+
+// Converts local file information to a GoogleGenerativeAI.Part object.
+/*function fileToGenerativePart(path, mimeType) {
+  return {
+    inlineData: {
+      data: Buffer.from(readFileSync(path)).toString("base64"),
+      mimeType
+    },
+  };
+} */
+
+async fixLaTeX(prompt: string) {
+    // For text-and-image input (multimodal), use the gemini-pro-vision model
+    const systemMessage = "I will give you some LaTeX for an AMC/AIME problem that may or may not be renderable (there might be some random html characters like &lt in there), I want you to fix any errors that may exist so that it can be rendered in LaTeX. Only write the output so that I can copy paste it with no further modifications.  Please make it look pretty as well so the answer choices should be on their own new line, make sure latex recognizes this by using $\\~\\$ to create a new line right before the answer choices";
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" ,systemInstruction: systemMessage});
+
+    const imageParts = [
+        //fileToGenerativePart("image1.png", "image/png"),
+        //fileToGenerativePart("image2.jpeg", "image/jpeg"),
+    ];
+
+    const result = await model.generateContent([prompt]);
+    const response = await result.response;
+    const text = response.text();
+    return text;
 }
 
+async getHint(problem: string, soln: string) {
+    // For text-and-image input (multimodal), use the gemini-pro-vision model
+    const systemMessage = "You will be given an AMC/AIME problem and its solution, and your task is to generate a hint for the problem. It should be relevant to the problem and solution and be helpful to someone struggling with the problem. It should be at most 10 words.";
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" ,systemInstruction: systemMessage});
 
+    const imageParts = [
+        //fileToGenerativePart("image1.png", "image/png"),
+        //fileToGenerativePart("image2.jpeg", "image/jpeg"),
+    ];
+
+    const result = await model.generateContent([`Problem: ${prob}\n Solution: ${soln}`]);
+    const response = await result.response;
+    const text = response.text();
+    return text;
+}
+
+async getTags(problem: string, soln: string) {
+    // For text-and-image input (multimodal), use the gemini-pro-vision model
+    const systemMessage = "You will be given an AMC/AIME problem and its solution, and your task is to generate a list of tags for the problem. They should be relevant to the problem and solution and not be superfluous like contest-math. There should be 5 tags max.";
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" ,systemInstruction: systemMessage});
+
+    const imageParts = [
+        //fileToGenerativePart("image1.png", "image/png"),
+        //fileToGenerativePart("image2.jpeg", "image/jpeg"),
+    ];
+
+    const result = await model.generateContent([`Problem: ${prob}\n Solution: ${soln}`]);
+    const response = await result.response;
+    const text = response.text();
+    return text;
+}
+
+};
+
+
+//console.log(await run(`Let $P$ be the parabola with equation $y=x^2$ and let $Q = (20, 14)$. There are real numbers $r$ and $s$ such that the line through $Q$ with slope $m$ does not intersect $P$ if and only if $r$ &lt; $m$ &lt; $s$. What is $r + s$?
+//$\textbf{(A)}\ 1\qquad\textbf{(B)}\ 26\qquad\textbf{(C)}\ 40\qquad\textbf{(D)}\ 52\qquad\textbf{(E)}\ 80$`));
+//}
+
+/*
+'gemini Problem: (''Kiran Kedlaya'') Three nonnegative real numbers $r_1$, $r_2$, $r_3$ are written on a blackboard. These numbers have the property that there exist integers $a_1$, $a_2$, $a_3$, not all zero, satisfying $a_1r_1 + a_2r_2 + a_3r_3 = 0$. We are permitted to perform the following operation: find two numbers $x$, $y$ on the blackboard with $x \le y$, then erase $y$ and write $y - x$ in its place. Prove that after a finite number of such operations, we can end up with at least one $0$ on the blackboard.
+
+Solution: Every time we perform an operation on the numbers on the blackboard $R = \left < r_1, r_2, r_3 \right >$, we perform the corresponding operation on the integers $A = \left < a_1, a_2, a_3 \right >$ so that $R \cdot A = 0$ continues to hold.  (For example, if we replace $r_1$ with $r_1 - r_2$ then we replace $a_2$ with $a_1 + a_2$.)
+
+It's possible to show we can always pick an operation so that $|A|^2$ is strictly decreasing. [[Without loss of generality]], let $r_3 > r_2 > r_1$ and $a_3$ be positive. Then it cannot be true that both $a_1$ and $a_2$ are at least $\frac { - a_3}{2}$, or else $a_1r_1 + a_2r_2 + a_3r_3 > 0$. Without loss of generality, let $a_1 < \frac { - a_3}{2}$. Then we can replace $a_1$ with $a_1 + a_3$ and $r_3$ with $r_3 - r_1$ to make $|A|$ smaller. Since it is a strictly decreasing sequence of positive integers, after a finite number of operations we have $a_3 = 0$. We can now  see that this result holds for $(r_1,r_2,0)$ if and only if it holds for $(1,\frac{r_2}{r_1},0)$. We can see that $\frac{r_2}{r_1}$ is a rational number given that $a_3$ = 0. It is a well known result of the euclidean algorithm that if we continue to perform these operations, $r_1$ or $r_2$ will eventually be 0.
+
+Your task: Write a set of tags for this problem, comma separated, based on the question and solution. Maximum 5. Should be relevant to the problem and not superfluous like “contest-math”. Also provide a numerical rating of the problem.
+*/

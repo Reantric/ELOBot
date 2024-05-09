@@ -14,5 +14,5 @@ export let setupInfo = {
     "commands": commandFiles,
     "events": eventFiles,
     "reacts": reactFiles,
-    "guildID": "838203182630305822"
+    "guildID": "1029199405657620500"
 };

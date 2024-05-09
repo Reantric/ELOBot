@@ -1,5 +1,6 @@
 import fetch from 'node-fetch';
 import katex from 'katex';
+import fs from 'fs';
 
 const formatLatex = (string) =>
     string
@@ -191,6 +192,78 @@ function randint(min ,max) {
   return Math.floor(Math.random()*(max-min+1)+min);
 }
 
+
+import path from 'path';
+const __dirname = import.meta.dirname;
+import { parseString, processors } from 'xml2js';
+
+function c(r, y) {
+  return 800 * (1 / (1 + Math.exp(-(y - 2020) / r)));
+}
+
+function f(x, y) {
+  const r = 200;
+  return 3 * c(r, y) + c(r, y) * Math.log10((1 - x) / x);
+}
+
+function calculateRatingsFromXml(filePath, probNum) {
+  const xmlContent = fs.readFileSync(filePath, 'utf8');
+  let rating = 0;
+  parseString(xmlContent, { explicitArray: false, tagNameProcessors: [processors.stripPrefix] }, (err, result) => {
+      if (err) {
+          console.error("Error parsing XML:", err);
+          return;
+      }
+
+      const ratings = [];
+      const details = result.Report.table1.Detail_Collection.Detail
+    //  console.log(details);
+      details.forEach(detail => {
+        const questionNumber = detail.$.Question;
+        const proportionCorrect = extractCorrectAnswerPercentage(detail.$);
+        console.log(proportionCorrect);
+        const rating = f(proportionCorrect/100.0, yr);
+        ratings[questionNumber] = rating;  // Store rating with question number as key
+      });
+  
+      // Optional: Output all stored ratings
+
+      if (ratings.hasOwnProperty(probNum)) {
+        rating = ratings[probNum].toFixed(2);
+      }
+      
+    });
+    return rating;
+}
+
+function extractCorrectAnswerPercentage(answers) {
+for (let key in answers) {
+if (answers[key].includes('*')) {
+    return parseFloat(answers[key].replace('*', ''));
+}
+}
+return 0; // Return 0 if no correct answer is marked
+}
+
+function simRating(k, yr) {
+  // Calculate the base value
+  let base = 1 - k / 26;
+  
+  // Define the fluctuation bounds, decreasing from 0.1 to 0.02 as k increases from 1 to 25
+  let maxFluctuation = 0.1 - (0.1 - 0.02) * (k / 25);
+  
+  // Generate random fluctuation between -maxFluctuation and maxFluctuation
+  let fluctuation = maxFluctuation * 2 * (Math.random() - 0.5);
+  
+  // Adding fluctuation to the base value
+  let fluctuatedValue = base + fluctuation;
+  
+  // Capping the output
+  let cappedValue = Math.max(0.02, Math.min(0.96, fluctuatedValue));
+  
+  return f(cappedValue,yr);
+}
+
 export async function randProb(){
   
   
@@ -222,7 +295,13 @@ export async function randProb(){
         console.log(specificProblemText);
        // console.log(problemSolutions);
       //  console.log(answer);
-        return [specificProblemText,problemSolutions,answer];
+      let rating;
+       try {
+        rating = calculateRatingsFromXml(path.join(__dirname, `itemDifficulty/Item Difficulty by Contest and Location12${yr}${v}.xml`),probNum);
+       } catch (e) {
+        rating = simRating(probNum,yr);
+       }
+        return [specificProblemText,problemSolutions,answer,rating, yr];
         OK = true;
       }
     } else {

@@ -57,7 +57,7 @@ export function randint(min: number,max: number) {
 
 const student = {
     points:1200,
-    rd:400,
+    rd:2500,
     vol:0.2,
 }
 
@@ -112,14 +112,14 @@ Bot.once("ready", async () => {
                 collection.forEach((member: GuildMember) => {
                     db.has(member.id).then((a: any) => {
                         if (!a){
-                            db.set(member.id, student)
+                            db.set(member.id, student);
                             console.log(member.user.username)
                         }
                     })
 
                     history.has(member.id).then(async (a: any) => {
                         if (!a){
-                            await history.set(member.id, [await db.get(`${member.id}.points`)]);
+                            await history.set(member.id, [student.points]);
                             console.log(member.user.username);
                         }
                     })
@@ -134,7 +134,8 @@ Bot.once("ready", async () => {
     
 Bot.on("guildMemberAdd", member => {
    if (!db.has(member.id)){ //if new member not in db, add them!
-    db.set(member.id, student)
+    db.set(member.id, student);
+    history.set(member.id,[student.points]);
    }
    var role: any = member.guild.roles.cache.find(role => role.name == "smilliam");
    member.roles.add(role);
@@ -143,7 +144,11 @@ Bot.on("guildMemberAdd", member => {
 Bot.on("interactionCreate", async (interaction: Interaction) => {
     console.log("I fired...")
 	if (!interaction.isCommand()) return;
-    handleCommand(interaction);
+    try {
+        handleCommand(interaction);
+    } catch (e) {
+        console.log(e);
+    }
 });
 
 async function handleButtonPress(interaction: ButtonInteraction){
@@ -183,7 +188,8 @@ Bot.on("guildCreate",async guild => {
     guild.members.fetch().then((collection) => {
         collection.forEach((member: GuildMember) => {
             if (!db.has(member.id)){ //if User ID is not already in database (db) then add them, else do nothing
-                db.set(member.id, student)
+                db.set(member.id, student);
+                history.set(member.id,[student.points]);
             }
 
         })
@@ -329,11 +335,11 @@ async function initIntelligentAgents(){
         }
     }); */
 
-    db.has("Ou").then((a: any) => {
+    /*db.has("Ou").then((a: any) => {
         if (!a){
             db.set("Ou", botProfile(3000))
         }
-    });
+    }); */
    // console.log("ROGER");
     //const hu = await db.get("Roger");
     //console.log(hu);

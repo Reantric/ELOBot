@@ -46,7 +46,7 @@ export default class add implements IBotInteraction {
         if (!user) {
             user = interaction.user;
         } 
-        const pts: any = interaction.options.get("skulls")?.value;
+        const pts: any = interaction.options.get("rating")?.value || 0;
         db.add(`${user.id}.points`,pts);
         interaction.reply("Successfully added");
     }
