@@ -209,18 +209,18 @@ export default class Leaderboard implements IBotInteraction {
                 if (guildArray.includes(o.id)) {
                     let pts,rd;
                     if (typeof o.value === 'string'){
-                        pts = JSON.parse(o.value).points;
-                        rd = JSON.parse(o.value).rd;
+                        pts = JSON.parse(o.value).pointsNIM;
+                        rd = JSON.parse(o.value).rdNIM;
                     }
                     else {
-                        pts = o.value.points;
-                        rd = o.value.rd;
+                        pts = o.value.pointsNIM;
+                        rd = o.value.rdNIM;
                     }
                     userArray.push([o.id, pts,rd])
                 }
             } else {
                 console.log("Roger?");
-                userArray.push([o.id,o.value.points,o.value.rd]);
+                userArray.push([o.id,o.value.pointsNIM,o.value.rdNIM]);
             }
         }
         userArray.sort((a: [string, number,number], b: [string, number,number]) => {

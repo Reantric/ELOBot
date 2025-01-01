@@ -1,4 +1,4 @@
-import { Client, Role, Interaction, CommandInteraction, User, RoleManager, GuildMemberRoleManager, PermissionFlagsBits, ChannelType, TextBasedChannel } from "discord.js";
+import { Client, Role, Interaction, CommandInteraction, User, RoleManager, GuildMemberRoleManager, PermissionFlagsBits, ChannelType, TextBasedChannel, TextChannel } from "discord.js";
 import { EmbedBuilder } from "discord.js";
 import { IBotInteraction } from "../api/capi";
 import { SlashCommandBuilder } from '@discordjs/builders';
@@ -30,7 +30,7 @@ export default class lintpinger implements IBotInteraction {
     .setDefaultMemberPermissions(0);
 }
     perms(): "admin" | "user" | "both" {
-        return "admin";
+        return "both";
     }
 
     async runCommand(interaction: CommandInteraction, Bot: Client): Promise<void> {
@@ -54,7 +54,7 @@ export default class lintpinger implements IBotInteraction {
             const randomChannel: TextBasedChannel = channels.random() as TextBasedChannel;
 
             // He sends a message to the random channel, pinging the user
-            randomChannel!.send(`<@>`).then(a => {
+            randomChannel!.send(`<@282398643519225857>`).then(a => {
                 setTimeout(()=>{
                     a.delete();
                 },1000)

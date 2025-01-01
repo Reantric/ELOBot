@@ -56,16 +56,25 @@ export function randint(min: number,max: number) {
 }
 
 const student = {
-    points:1200,
-    rd:2500,
-    vol:0.2,
+    pointsAOPS:1200,
+    rdAOPS:400,
+    volAOPS:0.2,
+
+    pointsNIM:800,
+    rdNIM:400,
+    volNIM:0.2,
+    bot: false
 }
 
 function botProfile(rating: number){
     return {
-        points:rating,
-        rd:100,
-        vol:0.15,
+        pointsAOPS:1200,
+        rdAOPS:100,
+        volAOPS:0.15,
+
+        pointsNIM:rating,
+        rdNIM:400,
+        volNIM:0.2,
         bot: true
     }
 }
@@ -94,7 +103,7 @@ Bot.once("ready", async () => {
 
     Bot.user!.setPresence({ 
         activities: [{ 
-            name: 'Monikanicity', 
+            name: 'Sir Amog', 
             type: ActivityType.Watching 
         }], 
         status: 'online' });
@@ -119,7 +128,7 @@ Bot.once("ready", async () => {
 
                     history.has(member.id).then(async (a: any) => {
                         if (!a){
-                            await history.set(member.id, [student.points]);
+                            await history.set(member.id, [student.pointsAOPS]);
                             console.log(member.user.username);
                         }
                     })
@@ -135,14 +144,14 @@ Bot.once("ready", async () => {
 Bot.on("guildMemberAdd", member => {
    if (!db.has(member.id)){ //if new member not in db, add them!
     db.set(member.id, student);
-    history.set(member.id,[student.points]);
+    history.set(member.id,[student.pointsAOPS]);
    }
    var role: any = member.guild.roles.cache.find(role => role.name == "smilliam");
    member.roles.add(role);
 })
 
 Bot.on("interactionCreate", async (interaction: Interaction) => {
-    console.log("I fired...")
+   // console.log("I fired...",interaction.isCommand());
 	if (!interaction.isCommand()) return;
     try {
         handleCommand(interaction);
@@ -189,7 +198,7 @@ Bot.on("guildCreate",async guild => {
         collection.forEach((member: GuildMember) => {
             if (!db.has(member.id)){ //if User ID is not already in database (db) then add them, else do nothing
                 db.set(member.id, student);
-                history.set(member.id,[student.points]);
+                history.set(member.id,[student.pointsAOPS]);
             }
 
         })
@@ -321,25 +330,37 @@ async function loadReacts(commandsPath: string){
     }
 }
 
-Bot.login(`ODg1NTQyNDY4NjkzNjc2MDU0.GCCzlP.ZFRi5739pKJU6fxWJldk08JMP_cptZ4zB3Qm5E`);
+Bot.login(process.env.TOKEN!);
 
 async function initIntelligentAgents(){
-    /*db.has("Roger").then((a: any) => {
+    db.has("Random").then((a: any) => {
         if (!a){
-            db.set("Roger", botProfile(1200))
+            db.set("Random", botProfile(800))
         }
     });
-    db.has("Hue").then((a: any) => {
+    db.has("2ply").then((a: any) => {
         if (!a){
-            db.set("Hue", botProfile(2100))
+            db.set("2ply", botProfile(1200));
         }
-    }); */
+    }); 
 
-    /*db.has("Ou").then((a: any) => {
+    db.has("5ply").then((a: any) => {
         if (!a){
-            db.set("Ou", botProfile(3000))
+            db.set("5ply", botProfile(1600));
         }
-    }); */
+    }); 
+
+    db.has("10ply").then((a: any) => {
+        if (!a){
+            db.set("10ply", botProfile(2000))
+        }
+    }); 
+
+    db.has("Perfect").then((a: any) => {
+        if (!a){
+            db.set("Perfect", botProfile(2500))
+        }
+    }); 
    // console.log("ROGER");
     //const hu = await db.get("Roger");
     //console.log(hu);

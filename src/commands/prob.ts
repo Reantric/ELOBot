@@ -305,7 +305,7 @@ export default class prob implements IBotInteraction {
         // Sending the question embed and the select menu
         let msgToHold = await interaction.editReply!({
             content: `<@${interaction.user.id}>`, // Replace 'RoleId' with the actual role ID
-            components: [row,buttonRow],
+            components: [row,buttonRow as any],
             files: [file],
             embeds: [skinnyEmbed]
         });
@@ -342,7 +342,7 @@ export default class prob implements IBotInteraction {
             const selection = (i as any).values[0].trim();  // Trimming any extra whitespace
             let verdict = selection == answer ? "RIGHT!?" : "WRONG!";  // Using strict comparison and ternary operator for clarity
         
-            await i.reply(`${i.user} has selected ${selection}... and they are ${verdict}`);
+            await i.reply({content: `You selected ${selection}... and you are ${verdict}`, ephemeral: true});
         
             if (verdict === "RIGHT!?") {
                 collector.stop('answerCorrect');  // Stop the collector with a reason
@@ -379,9 +379,9 @@ export default class prob implements IBotInteraction {
             } else {
                 interaction.channel?.send("You got it wrong, but it's okay. I will remember this.")
             }
-            let arr: [string, number, number][] = [[interaction.user.id, (await db.get(`${interaction.user.id}.points`))!, 0]];
+            let arr: [string, number, number][] = [[interaction.user.id, (await db.get(`${interaction.user.id}.pointsAOPS`))!, 0]];
             await this.update(interaction.user, rating, result);
-            arr[0][2] = (await db.get(`${interaction.user.id}.points`))!;
+            arr[0][2] = (await db.get(`${interaction.user.id}.pointsAOPS`))!;
             this.returnLB(interaction, arr);
         });
                 
@@ -389,12 +389,12 @@ export default class prob implements IBotInteraction {
 
     async update(userW: User, problemRating: number, result: number){
         var ranking = new glicko2.Glicko2();
-        let p1s = [await db.get(`${userW!.id}.points`),await db.get(`${userW!.id}.rd`),await db.get(`${userW!.id}.vol`)];
+        let p1s = [await db.get(`${userW!.id}.pointsAOPS`),await db.get(`${userW!.id}.rdAOPS`),await db.get(`${userW!.id}.volAOPS`)];
         let p2s = [problemRating,1,0.06];
 
         /*console.log("Ryan old rating: " + p1s[0]);
 console.log("Ryan old rating deviation: " + p1s[1]);
-console.log("Ryan old volatility: " + p1s[2]); */
+console.log("Ryan old volAOPSatility: " + p1s[2]); */
 
         var p1 = ranking.makePlayer(p1s[0],p1s[1],p1s[2]);
         var p2 = ranking.makePlayer(p2s[0],p2s[1],p2s[2]);
@@ -402,10 +402,10 @@ console.log("Ryan old volatility: " + p1s[2]); */
         console.log(p1s);
         /*console.log("Ryan new rating: " + p1.getRating());
 console.log("Ryan new rating deviation: " + p1.getRd());
-console.log("Ryan new volatility: " + p1.getVol());  */
-        await db.set(`${userW!.id}.points`,p1.getRating());
-        await db.set(`${userW!.id}.rd`,p1.getRd());
-        await db.set(`${userW!.id}.vol`,p1.getVol());
+console.log("Ryan new volAOPSatility: " + p1.getvolAOPS());  */
+        await db.set(`${userW!.id}.pointsAOPS`,p1.getRating());
+        await db.set(`${userW!.id}.rdAOPS`,p1.getRd());
+        await db.set(`${userW!.id}.volAOPS`,p1.getVol());
         history.push(userW.id,p1.getRating());
     }
 
@@ -425,7 +425,7 @@ console.log("Ryan new volatility: " + p1.getVol());  */
 
 async fixLaTeX(prompt: string) {
     // For text-and-image input (multimodal), use the gemini-pro-vision model
-    const systemMessage = "I will give you some LaTeX for an AMC/AIME problem that may or may not be renderable (there might be some random html characters like &lt in there), I want you to fix any errors that may exist so that it can be rendered in LaTeX. Only write the output so that I can copy paste it with no further modifications.  Please make it look pretty as well so the answer choices should be on their own new line, make sure latex recognizes this by using $\\~\\$ to create a new line right before the answer choices";
+    const systemMessage = `I will give you some LaTeX for an AMC/AIME problem that may contain errors or unwanted characters (such as random HTML entities or the \begin{problem} environment). Please fix any errors so that it can be rendered correctly in LaTeX. Ensure that the output does not include the \begin{problem} environment or any other unnecessary environments, and that it does not introduce errors like LaTeX Warning: Command \~ invalid in math mode. Format the answer choices so that each one is on a new line, using $\\~\\$ to create a new line before the answer choices. Only provide the fixed LaTeX code so I can copy and paste it directly.`;
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" ,systemInstruction: systemMessage});
 
     const imageParts = [

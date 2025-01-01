@@ -47,7 +47,7 @@ export default class add implements IBotInteraction {
             user = interaction.user;
         } 
         const pts: any = interaction.options.get("rating")?.value || 0;
-        db.add(`${user.id}.points`,pts);
+        db.add(`${user.id}.pointsAOPS`,pts);
         interaction.reply("Successfully added");
     }
 }

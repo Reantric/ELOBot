@@ -286,7 +286,7 @@ console.log("Ryan new volatility: " + p1.getVol());
 
         for (var i = 0; i < v.length; i++){
             arr.push([v[i][0],await (db.get(`${v[i][0]}.points`) as any),0]);
-            ppl.push([ranking.makePlayer(await db.get(`${v[i][0]}.points`),await db.get(`${v[i][0]}.rd`),await db.get(`${v[i][0]}.vol`))]);
+            ppl.push([ranking.makePlayer((await db.get(`${v[i][0]}.points`))!,(await db.get(`${v[i][0]}.rd`))!,(await db.get(`${v[i][0]}.vol`))!)]);
         }
         
         // perform update

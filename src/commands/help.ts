@@ -1,4 +1,4 @@
-import { ChatInputCommandInteraction, Client, GuildMemberRoleManager, PermissionFlagsBits, Role, SlashCommandStringOption } from "discord.js";
+import { ChannelType, ChatInputCommandInteraction, Client, GuildMemberRoleManager, PermissionFlagsBits, Role, SlashCommandStringOption, TextBasedChannel, TextChannel } from "discord.js";
 import { EmbedBuilder } from "discord.js";
 import { IBotInteraction } from "../api/capi";
 import { SlashCommandBuilder }from "@discordjs/builders"

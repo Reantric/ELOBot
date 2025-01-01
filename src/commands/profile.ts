@@ -34,8 +34,8 @@ export default class profile implements IBotInteraction {
     }
 
     private async formatProfileEmbed(user: User) {
-        const val = await db.get(`${user.id}.points`);
-        const rd = await db.get(`${user.id}.rd`);
+        const val = await db.get(`${user.id}.pointsNIM`);
+        const rd = await db.get(`${user.id}.rdNIM`);
         const embed = new EmbedBuilder();
         const title = Titles.getTitle(val);
         embed.setTitle(`${user.username}'s Profile`)

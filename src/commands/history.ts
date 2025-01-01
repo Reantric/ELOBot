@@ -39,6 +39,8 @@ export default class history implements IBotInteraction {
         return 'both';
     }
 
+
+    // this could definitely be improved via for loops and using Title
     async runCommand(interaction: ChatInputCommandInteraction, Bot: Client): Promise<void> {
         let user = interaction.options.getUser('target');
         if (!user) {
@@ -81,7 +83,7 @@ export default class history implements IBotInteraction {
             xaxis: {
                 tickangle: 0,
                 title: {
-                    text: "Games played",
+                    text: "Problems Solved",
                 },
                 showgrid: true,
                 zeroline: false,

@@ -5,15 +5,20 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "start": "npm run build && node dist/index"
   },
   "author": "Reantric, fanman1, ezou626",
   "license": "ISC",
   "dependencies": {
     "@google/generative-ai": "^0.11.0",
     "axios": "^1.6.8",
-    "better-sqlite3": "^8.5.1",
+    "better-sqlite3": "^11.7.0",
     "bluebird": "^3.7.2",
+    "chart.js": "^3.9.1",
+    "chartjs-node-canvas": "^4.1.6",
+    "chartjs-plugin-annotation": "^1.0.2",
     "discord.js": "^14.15.2",
     "dotenv": "^16.3.1",
     "express": "^4.19.2",

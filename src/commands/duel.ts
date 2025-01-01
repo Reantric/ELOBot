@@ -39,8 +39,8 @@ export default class duel implements IBotInteraction {
 
     async update(userW: User, user: User){
         var ranking = new glicko2.Glicko2();
-        let p1s = [await db.get(`${userW!.id}.points`),await db.get(`${userW!.id}.rd`),await db.get(`${userW!.id}.vol`)];
-        let p2s = [await db.get(`${user!.id}.points`),await db.get(`${user!.id}.rd`),await db.get(`${user!.id}.vol`)];
+        let p1s = [await db.get(`${userW!.id}.pointsAOPS`),await db.get(`${userW!.id}.rdAOPS`),await db.get(`${userW!.id}.volAOPS`)];
+        let p2s = [await db.get(`${user!.id}.pointsAOPS`),await db.get(`${user!.id}.rdAOPS`),await db.get(`${user!.id}.volAOPS`)];
 
         var p1 = ranking.makePlayer(p1s[0],p1s[1],p1s[2]);
         var p2 = ranking.makePlayer(p2s[0],p2s[1],p2s[2]);
@@ -49,12 +49,12 @@ export default class duel implements IBotInteraction {
         console.log("Ryan new rating: " + p1.getRating());
 console.log("Ryan new rating deviation: " + p1.getRd());
 console.log("Ryan new volatility: " + p1.getVol());
-        await db.set(`${userW!.id}.points`,p1.getRating());
-        await db.set(`${userW!.id}.rd`,p1.getRd());
-        await db.set(`${userW!.id}.vol`,p1.getVol());
-        await db.set(`${user!.id}.points`,p2.getRating());
-        await db.set(`${user!.id}.rd`,p2.getRd());
-        await db.set(`${user!.id}.vol`,p2.getVol());
+        await db.set(`${userW!.id}.pointsAOPS`,p1.getRating());
+        await db.set(`${userW!.id}.rdAOPS`,p1.getRd());
+        await db.set(`${userW!.id}.volAOPS`,p1.getVol());
+        await db.set(`${user!.id}.pointsAOPS`,p2.getRating());
+        await db.set(`${user!.id}.rdAOPS`,p2.getRd());
+        await db.set(`${user!.id}.volAOPS`,p2.getVol());
     }
 
     async runCommand(interaction: ChatInputCommandInteraction, Bot: Client): Promise<void> {

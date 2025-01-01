@@ -61,7 +61,7 @@ for (const o of await db.all()) {
   if (o.id == process.env.CLIENT_ID) {
       continue;
   }
-  const val = await db.get(`${o.id}.points`);
+  const val = await db.get(`${o.id}.pointsAOPS`);
 
   // Check the ranges and add to the respective array
   if (val >= 0 && val <= 999) {
