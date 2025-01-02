@@ -128,7 +128,11 @@ Bot.once("ready", async () => {
 
                     history.has(member.id).then(async (a: any) => {
                         if (!a){
-                            await history.set(member.id, [student.pointsAOPS]);
+                            history.set(member.id,{
+                                AOPS: [student.pointsAOPS],
+                                NIM: [student.pointsNIM],
+                                }
+                            );
                             console.log(member.user.username);
                         }
                     })
@@ -144,7 +148,11 @@ Bot.once("ready", async () => {
 Bot.on("guildMemberAdd", member => {
    if (!db.has(member.id)){ //if new member not in db, add them!
     db.set(member.id, student);
-    history.set(member.id,[student.pointsAOPS]);
+    history.set(member.id,{
+        AOPS: [student.pointsAOPS],
+        NIM: [student.pointsNIM],
+        }
+    );
    }
    var role: any = member.guild.roles.cache.find(role => role.name == "smilliam");
    member.roles.add(role);
@@ -198,7 +206,11 @@ Bot.on("guildCreate",async guild => {
         collection.forEach((member: GuildMember) => {
             if (!db.has(member.id)){ //if User ID is not already in database (db) then add them, else do nothing
                 db.set(member.id, student);
-                history.set(member.id,[student.pointsAOPS]);
+                history.set(member.id,{
+                    AOPS: [student.pointsAOPS],
+                    NIM: [student.pointsNIM],
+                    }
+                );
             }
 
         })
@@ -344,21 +356,27 @@ async function initIntelligentAgents(){
         }
     }); 
 
-    db.has("5ply").then((a: any) => {
+    db.has("8ply").then((a: any) => {
         if (!a){
-            db.set("5ply", botProfile(1600));
+            db.set("8ply", botProfile(1800));
         }
     }); 
 
-    db.has("10ply").then((a: any) => {
+    db.has("12ply").then((a: any) => {
         if (!a){
-            db.set("10ply", botProfile(2000))
+            db.set("12ply", botProfile(2100))
         }
     }); 
 
     db.has("Perfect").then((a: any) => {
         if (!a){
             db.set("Perfect", botProfile(2500))
+        }
+    }); 
+
+    db.has("Gemini").then((a: any) => {
+        if (!a){
+            db.set("Gemini", botProfile(1100))
         }
     }); 
    // console.log("ROGER");

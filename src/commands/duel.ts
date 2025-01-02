@@ -5,6 +5,7 @@ import { SlashCommandBuilder } from '@discordjs/builders';
 import { QuickDB } from "quick.db";
 const db = new QuickDB();
 import Titles from "../util/Titles.js";
+var history = db.table('history');
 // @ts-ignore
 import * as glicko2 from "glicko2";
 
@@ -39,8 +40,8 @@ export default class duel implements IBotInteraction {
 
     async update(userW: User, user: User){
         var ranking = new glicko2.Glicko2();
-        let p1s = [await db.get(`${userW!.id}.pointsAOPS`),await db.get(`${userW!.id}.rdAOPS`),await db.get(`${userW!.id}.volAOPS`)];
-        let p2s = [await db.get(`${user!.id}.pointsAOPS`),await db.get(`${user!.id}.rdAOPS`),await db.get(`${user!.id}.volAOPS`)];
+        let p1s = [await db.get(`${userW!.id}.pointsNIM`),await db.get(`${userW!.id}.rdNIM`),await db.get(`${userW!.id}.volNIM`)];
+        let p2s = [await db.get(`${user!.id}.pointsNIM`),await db.get(`${user!.id}.rdNIM`),await db.get(`${user!.id}.volNIM`)];
 
         var p1 = ranking.makePlayer(p1s[0],p1s[1],p1s[2]);
         var p2 = ranking.makePlayer(p2s[0],p2s[1],p2s[2]);
@@ -49,12 +50,14 @@ export default class duel implements IBotInteraction {
         console.log("Ryan new rating: " + p1.getRating());
 console.log("Ryan new rating deviation: " + p1.getRd());
 console.log("Ryan new volatility: " + p1.getVol());
-        await db.set(`${userW!.id}.pointsAOPS`,p1.getRating());
-        await db.set(`${userW!.id}.rdAOPS`,p1.getRd());
-        await db.set(`${userW!.id}.volAOPS`,p1.getVol());
-        await db.set(`${user!.id}.pointsAOPS`,p2.getRating());
-        await db.set(`${user!.id}.rdAOPS`,p2.getRd());
-        await db.set(`${user!.id}.volAOPS`,p2.getVol());
+        await db.set(`${userW!.id}.pointsNIM`,p1.getRating());
+        await db.set(`${userW!.id}.rdNIM`,p1.getRd());
+        await db.set(`${userW!.id}.volNIM`,p1.getVol());
+        await db.set(`${user!.id}.pointsNIM`,p2.getRating());
+        await db.set(`${user!.id}.rdNIM`,p2.getRd());
+        await db.set(`${user!.id}.volNIM`,p2.getVol());
+        history.push(`${userW.id}.NIM`,p1.getRating());
+        history.push(`${user.id}.NIM`,p1.getRating());
     }
 
     async runCommand(interaction: ChatInputCommandInteraction, Bot: Client): Promise<void> {

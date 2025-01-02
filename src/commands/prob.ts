@@ -406,7 +406,7 @@ console.log("Ryan new volAOPSatility: " + p1.getvolAOPS());  */
         await db.set(`${userW!.id}.pointsAOPS`,p1.getRating());
         await db.set(`${userW!.id}.rdAOPS`,p1.getRd());
         await db.set(`${userW!.id}.volAOPS`,p1.getVol());
-        history.push(userW.id,p1.getRating());
+        history.push(`${userW.id}.AOPS`,p1.getRating());
     }
 
     

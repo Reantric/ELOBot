@@ -34,22 +34,31 @@ export default class profile implements IBotInteraction {
     }
 
     private async formatProfileEmbed(user: User) {
-        const val = await db.get(`${user.id}.pointsNIM`);
-        const rd = await db.get(`${user.id}.rdNIM`);
+        const valNIM = await db.get(`${user.id}.pointsNIM`);
+        const rdNIM = await db.get(`${user.id}.rdNIM`);
+
+        const valAOPS = await db.get(`${user.id}.pointsAOPS`);
+        const rdAOPS = await db.get(`${user.id}.rdAOPS`);
         const embed = new EmbedBuilder();
-        const title = Titles.getTitle(val);
+        const NimTitle = Titles.getTitle(valNIM);
+        const AOPSTitle = Titles.getTitle(valAOPS);
         embed.setTitle(`${user.username}'s Profile`)
         .setDescription(`Here is ${user.username}'s info!`)
         .setAuthor({name: user.username, iconURL: user.avatarURL()!})
-        .setColor(title[1]) // add colors
+        .setColor(NimTitle[1]) // (max of both titles?)
         .addFields({
-            name: 'Rating',
-            value: `**${Math.floor(val)}** ± ${Math.round(rd)}`,
+            name: 'Nim Rating',
+            value: `**${Math.floor(valNIM)}** ± ${Math.round(rdNIM)}`,
+            inline: true
+        })
+        .addFields({
+            name: 'AOPS Rating',
+            value: `**${Math.floor(valAOPS)}** ± ${Math.round(rdAOPS)}`,
             inline: true
         })
         .addFields({
             name: 'Title',
-            value: `**${title[0]}**`,
+            value: `**${NimTitle[0]}**`,
             inline: true
         })
         .setThumbnail(user.avatarURL()!)

@@ -1,17 +1,17 @@
 import { ColorResolvable, Colors } from "discord.js";
 
 export default class Titles {
-
-    static Title: [string,ColorResolvable, number[],string][] = [
-        ["Exorcised",Colors.Grey,[0,999],""],
-        ["Grassman",Colors.Green,[1000,1399],""],
-        ["Specialist",Colors.Aqua,[1400,1799],""],
-        ["Expert",Colors.Blue,[1800,1999],""],
-        ["Candidate Master",Colors.Purple,[2000,2199],"CM"],
-        ["Nim Master",Colors.Yellow,[2200,2399],"NM"],
-        ["International Master",Colors.Orange,[2400,2499],"IM"],
-        ["Grandmaster",Colors.Red,[2500,2999],"GM"],
-        ["Omniscient",Colors.DarkRed,[3000,10000],"AMOG"] // Supremium
+    // [string,ColorResolvable, number[],string][]
+    static Title: [string,ColorResolvable, number[],string, string][] = [
+        ["Exorcised",Colors.Grey,[0,999],"",'#A9A9A9'],
+        ["Grassman",Colors.Green,[1000,1399],"",'green'],
+        ["Specialist",Colors.Aqua,[1400,1799],"",'#00FFFF'],
+        ["Expert",Colors.Blue,[1800,1999],"",'#0000ff'],
+        ["Candidate Master",Colors.Purple,[2000,2199],"CM",'magenta'],
+        ["Nim Master",Colors.Yellow,[2200,2399],"NM",'#FFFF00'],
+        ["International Master",Colors.Orange,[2400,2499],"IM",'#FFA500'],
+        ["Grandmaster",Colors.Red,[2500,2999],"GM",'#FF0000'],
+        ["Omniscient",Colors.DarkRed,[3000,10000],"AMOG",'#8B0000'] // Supremium
     ]
     
     private static getIndex(rating: number){

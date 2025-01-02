@@ -21,14 +21,16 @@ import { IBotInteraction } from "../api/capi";
 import { QuickDB } from "quick.db";
 import Titles from "../util/Titles.js";
 import { randint } from "../index.js";
+import { BotProfile, BotStrategyFactory, getRandomBotProfile } from "../util/BSFactory.js";
 
 const db = new QuickDB();
+var history = db.table('history');
 
 export default class Nim implements IBotInteraction {
     private readonly aliases = ["nim"];
 
     // Configuration
-    private readonly MOVE_TIMEOUT = 15000;        // 15 seconds total per turn
+    private readonly MOVE_TIMEOUT = 12000;        // 15 seconds total per turn
     private readonly COUNTDOWN_INTERVAL = 2000;   // 2 seconds between countdown updates
 
     name(): string {
@@ -54,7 +56,6 @@ export default class Nim implements IBotInteraction {
             .addUserOption(option =>
                 option.setName("opponent")
                     .setDescription("User to play Nim against")
-                    .setRequired(true)
             );
     }
 
@@ -62,8 +63,6 @@ export default class Nim implements IBotInteraction {
         return "both";
     }
 
-
-    // Handle the "/nim" command
     async runCommand(interaction: ChatInputCommandInteraction, Bot: Client): Promise<void> {
         let user1 = interaction.user;
         let user2 = interaction.options.getUser("opponent");
@@ -88,16 +87,19 @@ export default class Nim implements IBotInteraction {
 
             setTimeout(async () => {
                 try {
-                    await interaction.deferReply();
+                   // await interaction.deferReply();
     
                     // Start the game directly without confirmation
-                  //  [user1, user2] = swap(user1, user2); // Randomly decide who starts
-              //      await this.startGame(interaction, Bot, user1, user2);
+                    [user1, user2] = swap(user1, user2 as User); // Randomly decide who starts
+
+                    const randBotProfile = getRandomBotProfile();
+                    await interaction.followUp({ content: `Your opponent will be... ${randBotProfile}` });
+                    await this.startGame(interaction, Bot, user1, user2, randBotProfile);
                 } catch (error) {
                     console.error("Error starting game against the bot:", error);
                     await interaction.followUp({ content: "There was an error starting the game.", ephemeral: true });
                 }
-            }, 2000); // 2-second delay (adjust as needed)
+            }, 1000); // 2-second delay (adjust as needed)
     
             return; 
         }
@@ -168,20 +170,36 @@ export default class Nim implements IBotInteraction {
         });
     }
 
+    private randomSample<T>(array: T[], sampleSize: number): T[] {
+        if (sampleSize > array.length) {
+            throw new Error("Sample size cannot be larger than the array size");
+        }
+        const shuffled = [...array]; // Make a copy of the array
+        for (let i = array.length - 1; i > array.length - 1 - sampleSize; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]; // Swap
+        }
+        return shuffled.slice(array.length - sampleSize);
+    }
+
     private async startGame(
         interaction: ChatInputCommandInteraction,
         Bot: Client,
         user1: User,
-        user2: User
+        user2: User,
+        botProfile: BotProfile = BotProfile.None
     ) {
+        console.log("Selected BOT Profile: ", botProfile);
         // Let everyone know the game is starting
         await interaction.followUp({
             content: `Starting a game of Nim between ${user1} and ${user2}!`
         });
     
         // Initialize game state
-        const pileCount = randint(3, 5);
-        let piles = Array.from({ length: pileCount }, () => Math.floor(Math.random() * 9) + 1); // make distinct later
+        const pileCount = randint(3, 6);
+        const numbahs = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let piles = this.randomSample(numbahs, pileCount);
+       // let piles = Array.from({ length: pileCount }, () => Math.floor(Math.random() * 9) + 1); // make distinct later
         let currentPlayer = user1;
         let gameInProgress = true;
     
@@ -205,6 +223,7 @@ export default class Nim implements IBotInteraction {
             embeds: [initialEmbed],
             components: [buttonRow as any],
         });
+
     
         // Main game loop
         while (gameInProgress) {
@@ -235,6 +254,17 @@ export default class Nim implements IBotInteraction {
                 embeds: [turnEmbed],
                 components: [buttonRow as any],
             }) as any;
+
+            if (currentPlayer.bot) {
+                // Bot's turn: make a move automatically
+                gameInProgress = gameInProgress && await this.handleBotMove(interaction, Bot, gameMessage, piles, currentPlayer, user1, user2, botProfile);
+                // After Bot's move, switch the player
+                currentPlayer = currentPlayer.id === user1.id ? user2 : user1;
+                if (!gameInProgress) {
+                    break;
+                }
+                continue; // Proceed to the next iteration of the loop
+            }
     
             /* Start the countdown timer
             const countdownInterval = setInterval(async () => {
@@ -287,9 +317,9 @@ export default class Nim implements IBotInteraction {
                 // Parse the move
                 const move = msg.content.trim().split(/[\s,]+/).map(Number);
                 if (move.length !== 2 || isNaN(move[0]) || isNaN(move[1])) {
-                    await interaction.followUp(
-                        `${currentPlayer}, that's an invalid format. Use \`pileIndex numberOfSticks\`.`
-                    );
+                  //  await interaction.followUp(
+                   //     `${currentPlayer}, that's an invalid format. Use \`pileIndex numberOfSticks\`.`
+                  //  );
                     return;
                 }
     
@@ -313,7 +343,10 @@ export default class Nim implements IBotInteraction {
     
                 // Apply move
                 piles[pileIndex - 1] -= numberOfSticks;
-    
+                
+                // TODO: wrap isGameOver in a function and have the botMove return gameInProgress
+
+
                 // Check if the game is over
                 if (piles.every((p) => p === 0)) {
                     // Current player took the last sticks
@@ -321,9 +354,10 @@ export default class Nim implements IBotInteraction {
                     await interaction.followUp(
                         `${currentPlayer} took the last stick(s). ${currentPlayer} wins!`
                     );
+                    const loser = currentPlayer.id === user1.id ? user2 : user1;
                     await this.updateEloRatings(
-                        currentPlayer,
-                        currentPlayer.id === user1.id ? user2 : user1,
+                        currentPlayer.id,
+                        loser.id == Bot.user!.id ? botProfile as string : loser.id,
                         interaction,
                         Bot
                     );
@@ -335,6 +369,7 @@ export default class Nim implements IBotInteraction {
     
             // ----- Handle resign -----
             buttonCollector.on("collect", async (i) => {
+               await i.deferUpdate();
               //  console.log("IM STUCK2",currentPlayer.username)
                 // End the game
                 gameInProgress = false;
@@ -353,7 +388,7 @@ export default class Nim implements IBotInteraction {
                 const disabledRow = new ActionRowBuilder<ButtonBuilder>()
                     .addComponents(disabledButton);
     
-                await i.update({
+                await i.editReply({
                     content: `${currentPlayer.username} has resigned!`,
                     embeds: [],
                     components: [disabledRow as any],
@@ -361,15 +396,12 @@ export default class Nim implements IBotInteraction {
     
                 // The other player is the winner
                 const winner = currentPlayer.id === user1.id ? user2 : user1;
-                await this.updateEloRatings(winner, currentPlayer, interaction, Bot);
-    
-    
+                await this.updateEloRatings(winner.id == Bot.user!.id ? botProfile as string : winner.id, currentPlayer.id, interaction, Bot);
             });
     
             // ----- Handle collector end (timeout, etc.) -----
             moveCollector.on("end", async (collected, reason) => {
                 if (reason === "time" && !moveProcessed && !resigned && gameInProgress) {
-               //     clearInterval(countdownInterval);
                     gameInProgress = false;
     
                     // Current player took too long, so the other wins
@@ -379,8 +411,7 @@ export default class Nim implements IBotInteraction {
                     );
     
                     const winner = currentPlayer.id === user1.id ? user2 : user1;
-                    await this.updateEloRatings(winner, currentPlayer, interaction, Bot);
-    
+                    await this.updateEloRatings(winner.id == Bot.user!.id ? botProfile as string : winner.id, currentPlayer.id, interaction, Bot);    
                 }
             });
     
@@ -407,10 +438,47 @@ export default class Nim implements IBotInteraction {
         }
     }
 
-    async update(userW: User, user: User){
+    private async handleBotMove(
+        interaction: ChatInputCommandInteraction,
+        Bot: Client,
+        gameMessage: any,
+        piles: number[],
+        botPlayer: User,
+        user1: User,
+        user2: User,
+        botProfile: BotProfile = BotProfile.Random
+    ) {
+        try {
+            const strategy = await BotStrategyFactory.getStrategy(botProfile);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+    
+            const { pileIndex, sticksToRemove } = await strategy.makeMove(piles);
+            piles[pileIndex] -= sticksToRemove;
+    
+            await interaction.followUp(`${botProfile} removed **${sticksToRemove}** stick(s) from pile **${pileIndex + 1}**.`);
+    
+            if (piles.every(p => p === 0)) {
+                await interaction.followUp(`${botProfile} took the last stick(s). ${botProfile} wins!`);
+                await this.updateEloRatings(
+                    botProfile as string,
+                    botPlayer.id === user1.id ? user2.id : user1.id,
+                    interaction,
+                    Bot
+                );
+                return false;
+            }
+        } catch (error) {
+            console.error("Error in handleBotMove:", error);
+            await interaction.followUp("An error occurred while the bot was making a move.");
+        }
+        return true;
+    }
+    
+
+    async update(userWID: string, userID: string){
             var ranking = new glicko2.Glicko2();
-            let p1s = [await db.get(`${userW!.id}.pointsNIM`),await db.get(`${userW!.id}.rdNIM`),await db.get(`${userW!.id}.volNIM`)];
-            let p2s = [await db.get(`${user!.id}.pointsNIM`),await db.get(`${user!.id}.rdNIM`),await db.get(`${user!.id}.volNIM`)];
+            let p1s = [await db.get(`${userWID}.pointsNIM`),await db.get(`${userWID}.rdNIM`),await db.get(`${userWID}.volNIM`)];
+            let p2s = [await db.get(`${userID}.pointsNIM`),await db.get(`${userID}.rdNIM`),await db.get(`${userID}.volNIM`)];
     
             var p1 = ranking.makePlayer(p1s[0],p1s[1],p1s[2]);
             var p2 = ranking.makePlayer(p2s[0],p2s[1],p2s[2]);
@@ -419,30 +487,33 @@ export default class Nim implements IBotInteraction {
           //  console.log("Ryan new rating: " + p1.getRating());
    // console.log("Ryan new rating deviation: " + p1.getRd());
    // console.log("Ryan new volatility: " + p1.getVol());
-            await db.set(`${userW!.id}.pointsNIM`,p1.getRating());
-            await db.set(`${userW!.id}.rdNIM`,p1.getRd());
-            await db.set(`${userW!.id}.volNIM`,p1.getVol());
-            await db.set(`${user!.id}.pointsNIM`,p2.getRating());
-            await db.set(`${user!.id}.rdNIM`,p2.getRd());
-            await db.set(`${user!.id}.volNIM`,p2.getVol());
+            await db.set(`${userWID}.pointsNIM`,p1.getRating());
+            await db.set(`${userWID}.rdNIM`,p1.getRd());
+            await db.set(`${userWID}.volNIM`,p1.getVol());
+            await db.set(`${userID}.pointsNIM`,p2.getRating());
+            await db.set(`${userID}.rdNIM`,p2.getRd());
+            await db.set(`${userID}.volNIM`,p2.getVol());
+
+            history.push(`${userWID}.NIM`,p1.getRating());
+            history.push(`${userID}.NIM`,p1.getRating());
         }
     
 
     // Elo rating update
     private async updateEloRatings(
-        winner: User,
-        loser: User,
+        winner: string,
+        loser: string,
         interaction: ChatInputCommandInteraction,
         Bot: Client
     ) {
         
 
         let arr: [string, number, number][] = [
-            [winner.id, (await db.get(`${winner.id}.pointsNIM`))!, 0],
-            [loser.id, (await db.get(`${loser.id}.pointsNIM`))!, 0]];
+            [winner, (await db.get(`${winner}.pointsNIM`))!, 0],
+            [loser, (await db.get(`${loser}.pointsNIM`))!, 0]];
         await this.update(winner,loser);
-        arr[0][2] = (await db.get(`${winner.id}.pointsNIM`))!;
-        arr[1][2] = (await db.get(`${loser.id}.pointsNIM`))!;
+        arr[0][2] = (await db.get(`${winner}.pointsNIM`))!;
+        arr[1][2] = (await db.get(`${loser}.pointsNIM`))!;
         this.returnLB(interaction, arr);
     }
 
