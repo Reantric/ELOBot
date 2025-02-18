@@ -130,3 +130,6 @@ dist
 .pnp.*
 src/config.ts
 .DS_Store
+json.sqlite
+src/.DS_Store
+src/util/.DS_Store
