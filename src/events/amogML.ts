@@ -71,7 +71,7 @@ export default class amogML implements IBotEvent {
 
       //  msg.reply("You have sent " + JSON.stringify(msgList) + `${emoji}`);
         
-        if (msgList.length >= 4) {
+        if (msgList.length >= 3) {
             msgList.shift();
         }
         
@@ -79,7 +79,7 @@ export default class amogML implements IBotEvent {
 
         if (msgList.length > 0 && msg.author.id == '260118674306760705') {
             const allSameChannel = msgList.every(m => m.channel === msg.channel.id);
-            if (allSameChannel && Math.random() < 0.01) {
+            if (allSameChannel && Math.random() < 0.04) {
                 const msgChannel: Discord.Channel = Bot.channels.cache.get(msgList[0].channel) as Discord.Channel;
                 if (msgChannel instanceof Discord.TextChannel){
                     console.log("Generating response...");

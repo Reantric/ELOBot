@@ -2,7 +2,12 @@ import * as fs from 'fs';
 import path from 'path';
 
 // Compute the directory name of the current module file
-const __dirname = import.meta.dirname;
+//const __dirname = import.meta.dirname;
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 
 // Use path.join to construct paths for directories
 var commandFiles = fs.readdirSync(path.join(__dirname, 'commands'));

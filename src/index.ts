@@ -21,7 +21,15 @@ import {config} from 'dotenv';
 import { resolve } from 'path'; // Ensure path is imported
 import { IBotReact } from './api/rapi';
 
-const __dirname = import.meta.dirname;
+//const __dirname = import.meta.dirname;
+
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+
 config({ path: resolve(__dirname, '../.env') }); // Adjust the relative path according to your project's structure
 console.log('TOKEN:', process.env.TOKEN);
 console.log('CLIENT ID:', process.env.CLIENT_ID);
