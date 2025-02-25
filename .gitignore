@@ -133,3 +133,4 @@ src/config.ts
 json.sqlite
 src/.DS_Store
 src/util/.DS_Store
+src/util/UserEmulator/checkpoint-38000

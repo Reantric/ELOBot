@@ -33,6 +33,7 @@ var userBehavior = db.table('user');
 var questionId = db.table('id');
 var standings = db.table('rank');
 var history = db.table('history');
+var MLonMG = db.table('MLonMG');
 
 const botIntents = [
     GatewayIntentBits.Guilds,
@@ -107,7 +108,7 @@ Bot.once("ready", async () => {
             type: ActivityType.Watching 
         }], 
         status: 'online' });
-    Bot.user?.setUsername("Linty");
+    Bot.user?.setUsername("Bendy");
     questionId.set("id", 0);
     standings.set("standings", []);
     standings.set("currentWord",[]);
@@ -133,6 +134,13 @@ Bot.once("ready", async () => {
                                 NIM: [student.pointsNIM],
                                 }
                             );
+                            console.log(member.user.username);
+                        }
+                    })
+
+                    MLonMG.has(member.id).then(async (a: any) => {
+                        if (!a){ // lol
+                            MLonMG.set(member.id,[]);
                             console.log(member.user.username);
                         }
                     })
