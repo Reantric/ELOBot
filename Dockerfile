@@ -1,9 +1,10 @@
 # Use an official Node.js image
 FROM node:23
 
-# Install system dependencies required for native modules
+# Install system dependencies required for native modules and Python dependencies
 RUN apt-get update && apt-get install -y \
     python3 \
+    python3-pip \
     build-essential \
     pkg-config \
     libsqlite3-dev \
@@ -35,15 +36,21 @@ RUN apt-get update && apt-get install -y \
     wget \
     curl
 
+# Install Python dependencies (including torch)
+RUN pip3 install --break-system-packages torch transformers
+
 # Set working directory inside container
 WORKDIR /app
 
-# Copy package files for caching and install dependencies with build-from-source flag
+# Copy package files and install Node dependencies
 COPY package*.json ./
 RUN npm install --legacy-peer-deps --build-from-source
 
 # Force rebuild of better-sqlite3 from source
 RUN npm rebuild better-sqlite3 --build-from-source
+
+# Optional: Debug step to confirm binary architecture
+RUN file /app/node_modules/better-sqlite3/build/Release/better_sqlite3.node
 
 # Copy the rest of the application's code
 COPY . .

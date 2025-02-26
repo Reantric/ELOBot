@@ -37,7 +37,7 @@ export default class amogML implements IBotEvent {
             });
     
             return cleaned;
-        }).join("\n");
+        }).join("\n") + "\n";
     }
 
     /**
@@ -58,7 +58,7 @@ export default class amogML implements IBotEvent {
     
     async runEvent(msg: Discord.Message, Bot: Discord.Client): Promise<void> {
        if (msg.author.bot) return;
-     //   if (msg.guild!.id != '838203182630305822') return;
+       if (msg.guild!.id != '838203182630305822') return;
       //console.log(msg.content);
 
         let msgList: { content: string, channel: string }[] = (await MLonMG.get(msg.author.id)) || [];
@@ -69,7 +69,7 @@ export default class amogML implements IBotEvent {
        // const emoji = msg.guild!.emojis.cache.find(e => e.name === "ithink");
 
 
-      //  msg.reply("You have sent " + JSON.stringify(msgList) + `${emoji}`);
+        msg.reply("You have sent " + JSON.stringify(msgList));
         
         if (msgList.length >= 3) {
             msgList.shift();
@@ -77,9 +77,9 @@ export default class amogML implements IBotEvent {
         
         await MLonMG.set(msg.author.id, msgList);
 
-        if (msgList.length > 0 && msg.author.id == '260118674306760705') {
+        if (msgList.length > 0 && msg.author.id != '260118674306760705') {
             const allSameChannel = msgList.every(m => m.channel === msg.channel.id);
-            if (allSameChannel && Math.random() < 0.04) {
+            if (allSameChannel && Math.random() < 4) {
                 const msgChannel: Discord.Channel = Bot.channels.cache.get(msgList[0].channel) as Discord.Channel;
                 if (msgChannel instanceof Discord.TextChannel){
                     console.log("Generating response...");

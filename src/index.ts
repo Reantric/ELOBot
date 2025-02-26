@@ -116,7 +116,7 @@ Bot.once("ready", async () => {
             type: ActivityType.Watching 
         }], 
         status: 'online' });
-    Bot.user?.setUsername("Bendy");
+    Bot.user?.setUsername("Linty");
     questionId.set("id", 0);
     standings.set("standings", []);
     standings.set("currentWord",[]);
