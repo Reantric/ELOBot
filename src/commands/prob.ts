@@ -55,9 +55,14 @@ export default class prob implements IBotInteraction {
        // const leaderboardData = await this.fetchLeaderboardData(msg.guild!.id, msg);
 
         // Create and send the embed with pagination
+        if (!msg.channel?.isTextBased)
+            return;
+
+        let channel = msg.channel as Discord.TextChannel;
+
         const embed = this.createLeaderboardEmbed(leaderboardData, 0, msg); // Start at page 0
         const buttons: any = this.createPaginationButtons(0);
-        await msg.channel!.send({ embeds: [embed], components: [buttons]});
+        await channel!.send({ embeds: [embed], components: [buttons]});
 
         let currentPage = 0;
 
@@ -370,14 +375,19 @@ export default class prob implements IBotInteraction {
                 });
             }
 
+            if (!interaction.channel?.isTextBased)
+            return;
+
+            let channel = interaction.channel as Discord.TextChannel;
+
             let result = 0;
             if (tryCount == 1){
                 if (isSkip)
                     return;
-                interaction.channel?.send("Nice, you got it right. I will remember this.");
+                channel?.send("Nice, you got it right. I will remember this.");
                 result = 1;
             } else {
-                interaction.channel?.send("You got it wrong, but it's okay. I will remember this.")
+                channel?.send("You got it wrong, but it's okay. I will remember this.")
             }
             let arr: [string, number, number][] = [[interaction.user.id, (await db.get(`${interaction.user.id}.pointsAOPS`))!, 0]];
             await this.update(interaction.user, rating, result);

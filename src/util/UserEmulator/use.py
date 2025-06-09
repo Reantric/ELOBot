@@ -28,6 +28,7 @@ def generate_text(prompt):
             inputs['input_ids'],
             attention_mask=inputs['attention_mask'],
             max_length=generation_max_length,  # prompt length + new tokens
+            do_sample=True,  
             num_return_sequences=1,
             temperature=0.5,
             top_k=100,

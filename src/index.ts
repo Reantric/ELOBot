@@ -117,6 +117,8 @@ Bot.once("ready", async () => {
         }], 
         status: 'online' });
     Bot.user?.setUsername("Linty");
+   // Bot.guilds.cache.find(guild => guild.id == '1029199405657620500')?.setName("polaris' best friend!");
+
     questionId.set("id", 0);
     standings.set("standings", []);
     standings.set("currentWord",[]);
@@ -189,7 +191,7 @@ async function handleButtonPress(interaction: ButtonInteraction){
 }
 
 Bot.on("messageCreate", msg => {
-    if (msg.author.bot && msg.author.id != '432610292342587392') return;
+    if (msg.author.bot && msg.author.id != '432610292342587392' && msg.author.id != '237844886030778368') return;
     handleEvent(msg); // checks every message regardless of what it contains
     if (msg.channel.type == ChannelType.DM){
         msg.author.send(`Please talk to me on a server! This ensures more engagement and reliability.`);

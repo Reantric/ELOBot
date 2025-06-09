@@ -341,7 +341,7 @@ var chart = { data: [puritan,seasoned,unhinged,expert,CandMas, Master, IntMas, G
 let john= new Promise<void>((resolve,reject) => {
   plotly.getImage(chart, imgOpts, async function (error: any, imageStream: { pipe: (arg0: any) => any; }) {
   if (error) return console.error(reject);
-  await imageStream.pipe(fs.createWriteStream('temp/senti.png'));
+  await imageStream.pipe(fs.createWriteStream('dist/temp/senti.png'));
   })
   resolve();
 })  
@@ -351,7 +351,7 @@ let john= new Promise<void>((resolve,reject) => {
       john.then(_ => { // later let discord just take the imageStream itself, no need to save to file
         setTimeout(function() {
         
-          const file = new AttachmentBuilder('temp/senti.png'); // replace with your file's path
+          const file = new AttachmentBuilder('dist/temp/senti.png'); // replace with your file's path
           interaction.editReply({ content: `Sample size: ${count}`, files: [file] });}
           ,5000);
       });

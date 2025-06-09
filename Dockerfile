@@ -1,5 +1,5 @@
 # Use an official Node.js image
-FROM node:23
+FROM node:23-slim
 
 # Install system dependencies required for native modules and Python dependencies
 RUN apt-get update && apt-get install -y \
@@ -36,8 +36,13 @@ RUN apt-get update && apt-get install -y \
     wget \
     curl
 
-# Install Python dependencies (including torch)
-RUN pip3 install --break-system-packages torch transformers
+# Install torch packages from PyTorch's CPU index
+RUN pip3 install --break-system-packages --no-cache-dir \
+    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+# Install transformers from the default index
+RUN pip3 install --break-system-packages --no-cache-dir transformers
+
 
 # Set working directory inside container
 WORKDIR /app

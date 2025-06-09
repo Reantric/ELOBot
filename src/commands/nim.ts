@@ -16,6 +16,7 @@ import {
     Message,
     ButtonInteraction,
     Interaction,
+    TextChannel,
 } from "discord.js";
 import { IBotInteraction } from "../api/capi";
 import { QuickDB } from "quick.db";
@@ -66,6 +67,11 @@ export default class Nim implements IBotInteraction {
     async runCommand(interaction: ChatInputCommandInteraction, Bot: Client): Promise<void> {
         let user1 = interaction.user;
         let user2 = interaction.options.getUser("opponent");
+
+        if (!interaction.channel?.isTextBased()) {
+            return;
+        }
+        let channel = interaction.channel as TextChannel;
 
         // Basic checks
         if (!user2) {
@@ -124,7 +130,7 @@ export default class Nim implements IBotInteraction {
         const row = new ActionRowBuilder<ButtonBuilder>()
             .addComponents(confirmButton, declineButton);
 
-        const confirmationMessage = await interaction.channel!.send({
+        const confirmationMessage = await channel.send({
             content: `${user2}`,
             embeds: [confirmationEmbed],
             components: [row as any],
@@ -217,9 +223,11 @@ export default class Nim implements IBotInteraction {
     
         // Put the button in a row
         const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(resignButton);
-    
+        
+        let channel = interaction.channel as TextChannel;
+
         // Send the initial game message
-        let gameMessage = await interaction.channel!.send({
+        let gameMessage = await channel.send({
             embeds: [initialEmbed],
             components: [buttonRow as any],
         });
@@ -297,7 +305,7 @@ export default class Nim implements IBotInteraction {
             const buttonFilter = (i: MessageComponentInteraction) =>
                 i.customId === "resign_nim" && i.user.id === currentPlayer.id;
     
-            const moveCollector = interaction.channel!.createMessageCollector({
+            const moveCollector = channel.createMessageCollector({
                 filter: messageFilter,
                 time: this.MOVE_TIMEOUT,
             });
@@ -524,7 +532,7 @@ export default class Nim implements IBotInteraction {
             // Create and send the embed with pagination
             const embed = this.createLeaderboardEmbed(leaderboardData, 0, msg); // Start at page 0
             const buttons: any = this.createPaginationButtons(0);
-            await msg.channel!.send({ embeds: [embed], components: [buttons]});
+            await (msg.channel! as TextChannel).send({ embeds: [embed], components: [buttons]});
     
             let currentPage = 0;
     

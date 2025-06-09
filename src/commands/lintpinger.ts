@@ -51,7 +51,7 @@ export default class lintpinger implements IBotInteraction {
 
             // He selects a random channel from the guild
             const channels = guild.channels.cache.filter(c => c.type === ChannelType.GuildText);
-            const randomChannel: TextBasedChannel = channels.random() as TextBasedChannel;
+            const randomChannel: TextChannel = channels.random() as TextChannel;
 
             // He sends a message to the random channel, pinging the user
             randomChannel!.send(`<@282398643519225857>`).then(a => {

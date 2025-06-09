@@ -15,12 +15,17 @@ export default class skatch implements IBotReact {
     }   
 
     async use(reaction: Discord.MessageReaction | Discord.PartialMessageReaction, user: Discord.User | Discord.PartialUser, Bot: Discord.Client<boolean>): Promise<void> {
+        if (!reaction.message.channel?.isTextBased)
+                    return;
+        
+        let channel = reaction.message.channel as Discord.TextChannel;
+        
         console.log("HI BUD");
         console.log(`${reaction.message.author}'s message "${reaction.message.content}" gained a reaction!`);
         // The reaction is now also fully available and the properties will be reflected accurately:
         console.log(`${reaction.count} user(s) have given the same reaction to this message!`);
         db.add(`${reaction.message.author!.id}.points`,1);
 
-        reaction.message.channel.send("That bastard reacted... HUE!?")
+        channel.send("That bastard reacted... HUE!?")
     }
   }

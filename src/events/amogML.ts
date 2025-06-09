@@ -57,8 +57,11 @@ export default class amogML implements IBotEvent {
     
     
     async runEvent(msg: Discord.Message, Bot: Discord.Client): Promise<void> {
-       if (msg.author.bot) return;
-       if (msg.guild!.id != '838203182630305822') return;
+       if (msg.author.bot || !msg.channel.isTextBased()) return;
+       if (msg.channel.id != '1379913904884289556') return; // Only listen to messages in the specific channel
+
+       let channel = msg.channel as Discord.TextChannel;
+      // if (msg.guild!.id != '838203182630305822') return;
       //console.log(msg.content);
 
         let msgList: { content: string, channel: string }[] = (await MLonMG.get(msg.author.id)) || [];
@@ -67,25 +70,45 @@ export default class amogML implements IBotEvent {
         msgList.push({content: msg.content, channel: msg.channel.id});
 
        // const emoji = msg.guild!.emojis.cache.find(e => e.name === "ithink");
-
-
-        msg.reply("You have sent " + JSON.stringify(msgList));
         
-        if (msgList.length >= 3) {
+        if (msgList.length >= 8) {
             msgList.shift();
         }
+       // msg.reply("You have sent " + JSON.stringify(msgList));
+
         
         await MLonMG.set(msg.author.id, msgList);
+        let v = (msg.content.toLowerCase().includes("linty") && msg.author.id != '237844886030778368')  ? "" : "polaris, ";
+        if (msg.author.id == '260118674306760705'){
+            v = 'moni, '
+        }
+        if (msg.author.id == '115926183576731656')
+            v = 'Wa Floyd, '
 
-        if (msgList.length > 0 && msg.author.id != '260118674306760705') {
-            const allSameChannel = msgList.every(m => m.channel === msg.channel.id);
-            if (allSameChannel && Math.random() < 4) {
+        if (msg.author.id == '118663865264242688')
+            v = "snow hu, "
+
+        let shouldRespond =
+            msgList.length > 0 &&
+            (
+                msg.content.toLowerCase().includes("linty") ||
+                msg.author.id == '260118674306760705' ||
+                msg.author.id == '237844886030778368' ||
+                msg.author.id == '115926183576731656' ||
+                msg.author.id == '118663865264242688'
+            );
+
+        if (shouldRespond) { 
+          //  const allSameChannel = msgList.every(m => m.channel === msg.channel.id);
+           // console.log("All messages in the same channel");
+            if (msg.content.toLowerCase().includes("linty") || Math.random() < 0.01) { 
                 const msgChannel: Discord.Channel = Bot.channels.cache.get(msgList[0].channel) as Discord.Channel;
                 if (msgChannel instanceof Discord.TextChannel){
                     console.log("Generating response...");
+                    channel.sendTyping(); // Simulate typing
                     console.log(this.cleanup(msgList.map(message => message.content),msgChannel.name,Bot));
                     generateResponse(this.cleanup(msgList.map(message => message.content),msgChannel.name,Bot)).then((response) => {
-                    msg.reply('*[AMOG]:* ' + this.cleandown(response,Bot));
+                    msg.reply(`${v}${this.cleandown(response,Bot)}`);
             });
         }
 

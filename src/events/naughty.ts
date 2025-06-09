@@ -25,14 +25,16 @@ export default class naughty implements IBotEvent {
     
     
     async runEvent(msg: Discord.Message, Bot: Discord.Client): Promise<void> {
-        // Check if the message contains the specific phrase
+        if (!msg.channel.isTextBased()) return;
+        let channel = msg.channel as Discord.TextChannel;
+        
         if (msg.content.toLowerCase().includes("say fundamental theorem of abelian groups but")) {
             try {
                 // Delete the original message
                 await msg.delete();
     
                 // Send the response with a tagged mention
-                const sentMessage = await msg.channel.send(
+                const sentMessage = await channel.send(
                     `<@${msg.author.id}> https://i.pinimg.com/originals/ab/64/74/ab6474fe98a4dc18fa7fbef219e20518.gif`
                 );
     

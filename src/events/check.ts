@@ -28,11 +28,14 @@ export default class check implements IBotEvent {
     private async returnLB(msg: Discord.Message, leaderboardData: [string, number, number][]){
         // Fetch data from database
        // const leaderboardData = await this.fetchLeaderboardData(msg.guild!.id, msg);
+    if (!msg.channel?.isTextBased)
+            return;
 
+        let channel = msg.channel as Discord.TextChannel;
         // Create and send the embed with pagination
         const embed = this.createLeaderboardEmbed(leaderboardData, 0, msg); // Start at page 0
         const buttons: any = this.createPaginationButtons(0);
-        await msg.channel.send({ embeds: [embed], components: [buttons]});
+        await channel.send({ embeds: [embed], components: [buttons]});
 
         let currentPage = 0;
 
@@ -244,7 +247,10 @@ console.log("Ryan new volatility: " + p1.getVol());
             count++;
             let phrase = m.slice(m.length-5,m.length-2);
             let usr: Discord.User = msg.mentions.users.first()!;
-            msg.channel.send(phrase);
+         
+            
+            let channel = msg.channel as Discord.TextChannel;
+            channel.send(phrase);
             if (!usrPoints.has(usr.id)){
                 usrPoints.set(usr.id,0);
             }
