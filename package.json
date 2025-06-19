@@ -13,9 +13,11 @@
   "license": "ISC",
   "dependencies": {
     "@google/generative-ai": "^0.11.0",
+    "@types/node-fetch": "^2.6.12",
     "axios": "^1.6.8",
     "better-sqlite3": "^11.7.0",
     "bluebird": "^3.7.2",
+    "canvas": "^3.1.0",
     "chart.js": "^3.9.1",
     "chartjs-node-canvas": "^4.1.6",
     "chartjs-plugin-annotation": "^1.0.2",
@@ -24,20 +26,22 @@
     "express": "^4.19.2",
     "express-promise-router": "^4.1.1",
     "express-queue": "^0.0.13",
+    "gif-encoder-2": "^1.0.5",
     "glicko2": "^1.1.0",
     "jsdom": "^24.0.0",
     "katex": "^0.16.10",
-    "node-fetch": "^3.3.2",
+    "node-fetch": "^2.7.0",
     "plotly": "^1.0.6",
     "puppeteer": "^24.3.0",
     "quick.db": "^9.1.7",
     "quickdb": "^1.0.5",
-    "sharp": "^0.33.3",
+    "sharp": "^0.33.5",
     "shelljs": "^0.8.5",
     "transformers": "^1.8.3",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
+    "ts-node": "^10.9.2",
     "typescript": "^5.1.6"
   }
 }

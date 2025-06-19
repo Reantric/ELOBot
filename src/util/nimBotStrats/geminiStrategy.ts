@@ -1,9 +1,9 @@
-import { BotStrategy } from "../../models/BotStrategy";
+import { NimBotStrategy } from "../../models/NimBotStrategy";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { readFileSync } from "fs";
-const genAI = new GoogleGenerativeAI("AIzaSyBv0y1ri9woqXzPouncQWZiH8fbxgGJZQo");
+const genAI = new GoogleGenerativeAI("AIzaSyDW6wzTNDIFhlmI_IFF9bacKLAKl1vOgj8");
 
-export class GeminiStrategy implements BotStrategy {
+export default class GeminiStrategy implements NimBotStrategy {
     private model;
 
     constructor() {
@@ -13,20 +13,39 @@ export class GeminiStrategy implements BotStrategy {
 - The response contains only the JSON object without any additional text or explanations.`;
 
         this.model = genAI.getGenerativeModel({
-            model: "gemini-1.5-pro-latest",
+            model: "gemini-2.0-flash",
             systemInstruction: systemMessage
         });
+    }
+    getName(): string {
+        return "Gemini";
+    }
+    getDescription(): string {
+        return "A strategy that uses Google Gemini AI to generate moves in the Nim game. It provides a JSON response with the pile index and number of sticks to remove.";
     }
 
     async makeMove(piles: number[]): Promise<{ pileIndex: number; sticksToRemove: number }> {
         // Prepare the prompt with the current game state
         const prompt = `Current piles: [${piles.join(", ")}]
-Provide your move as a JSON object with "pileIndex" and "sticksToRemove".`;
+Provide your move as a JSON object with "pileIndex" and "sticksToRemove". Just the raw code please, no \`\`\`JSON tags or wrapping it in a code block. So like just return 
+{
+  "pileIndex": whatever you choose,
+  "sticksToRemove": whatever you choose
+} in this exact format. No code blocks. Play as well as you can.`;
 
         try {
             const result = await this.model.generateContent([prompt]);
             const response = await result.response;
-            const text = response.text().trim();
+            let text = response.text().trim();
+            
+
+            console.log("Gemini response: " + text);
+
+            // Use regex to extract the JSON object from the response, even if it's wrapped in markdown
+            const jsonMatch = text.match(/{[\s\S]*}/);
+            if (jsonMatch) {
+                text = jsonMatch[0];
+            }
 
             // Validate and parse the response
             const move = JSON.parse(text);

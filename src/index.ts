@@ -20,6 +20,7 @@ import { secrets } from './config';
 import {config} from 'dotenv';
 import { resolve } from 'path'; // Ensure path is imported
 import { IBotReact } from './api/rapi';
+import Connect4 from './commands/connect4';
 
 //const __dirname = import.meta.dirname;
 
@@ -35,6 +36,8 @@ console.log('TOKEN:', process.env.TOKEN);
 console.log('CLIENT ID:', process.env.CLIENT_ID);
 
 import { QuickDB } from "quick.db";
+import { NimBotStrategyFactory } from './util/NimBSFactory.js';
+import { Connect4StrategyFactory } from './util/Connect4BSFactory.js';
 const db = new QuickDB();
 
 var userBehavior = db.table('user');
@@ -397,7 +400,13 @@ async function initIntelligentAgents(){
             db.set("Gemini", botProfile(1100))
         }
     }); 
-   // console.log("ROGER");
-    //const hu = await db.get("Roger");
-    //console.log(hu);
+
+    // Load the bot strategies
+
+    const nimFactory = NimBotStrategyFactory.getInstance();
+    await nimFactory.init();
+
+    const connect4Factory = Connect4StrategyFactory.getInstance();
+    await connect4Factory.init();
+
 }

@@ -22,7 +22,8 @@ import { IBotInteraction } from "../api/capi";
 import { QuickDB } from "quick.db";
 import Titles from "../util/Titles.js";
 import { randint } from "../index.js";
-import { BotProfile, BotStrategyFactory, getRandomBotProfile } from "../util/BSFactory.js";
+import { NimBotStrategyFactory } from "../util/NimBSFactory.js";
+import { NimBotStrategy } from "../models/NimBotStrategy.js";
 
 const db = new QuickDB();
 var history = db.table('history');
@@ -68,11 +69,6 @@ export default class Nim implements IBotInteraction {
         let user1 = interaction.user;
         let user2 = interaction.options.getUser("opponent");
 
-        if (!interaction.channel?.isTextBased()) {
-            return;
-        }
-        let channel = interaction.channel as TextChannel;
-
         // Basic checks
         if (!user2) {
             user2 = Bot.user!;
@@ -98,8 +94,9 @@ export default class Nim implements IBotInteraction {
                     // Start the game directly without confirmation
                     [user1, user2] = swap(user1, user2 as User); // Randomly decide who starts
 
-                    const randBotProfile = getRandomBotProfile();
-                    await interaction.followUp({ content: `Your opponent will be... ${randBotProfile}` });
+                    const factory = NimBotStrategyFactory.getInstance();
+                    const randBotProfile = factory.getRandomBotStrategy();
+                    await interaction.followUp({ content: `Your opponent will be... ${randBotProfile.getName()}` });
                     await this.startGame(interaction, Bot, user1, user2, randBotProfile);
                 } catch (error) {
                     console.error("Error starting game against the bot:", error);
@@ -130,7 +127,8 @@ export default class Nim implements IBotInteraction {
         const row = new ActionRowBuilder<ButtonBuilder>()
             .addComponents(confirmButton, declineButton);
 
-        const confirmationMessage = await channel.send({
+        let channel = interaction.channel as TextChannel;
+        const confirmationMessage = await channel!.send({
             content: `${user2}`,
             embeds: [confirmationEmbed],
             components: [row as any],
@@ -193,9 +191,9 @@ export default class Nim implements IBotInteraction {
         Bot: Client,
         user1: User,
         user2: User,
-        botProfile: BotProfile = BotProfile.None
+        botStrategy?: NimBotStrategy
     ) {
-        console.log("Selected BOT Profile: ", botProfile);
+        console.log("Selected BOT Strategy: ", botStrategy?.getName());
         // Let everyone know the game is starting
         await interaction.followUp({
             content: `Starting a game of Nim between ${user1} and ${user2}!`
@@ -223,11 +221,10 @@ export default class Nim implements IBotInteraction {
     
         // Put the button in a row
         const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(resignButton);
-        
-        let channel = interaction.channel as TextChannel;
-
+    
         // Send the initial game message
-        let gameMessage = await channel.send({
+        let channel = interaction.channel as TextChannel;
+        let gameMessage = await channel!.send({
             embeds: [initialEmbed],
             components: [buttonRow as any],
         });
@@ -265,7 +262,7 @@ export default class Nim implements IBotInteraction {
 
             if (currentPlayer.bot) {
                 // Bot's turn: make a move automatically
-                gameInProgress = gameInProgress && await this.handleBotMove(interaction, Bot, gameMessage, piles, currentPlayer, user1, user2, botProfile);
+                gameInProgress = gameInProgress && await this.handleBotMove(interaction, Bot, gameMessage, piles, currentPlayer, user1, user2, botStrategy);
                 // After Bot's move, switch the player
                 currentPlayer = currentPlayer.id === user1.id ? user2 : user1;
                 if (!gameInProgress) {
@@ -305,7 +302,8 @@ export default class Nim implements IBotInteraction {
             const buttonFilter = (i: MessageComponentInteraction) =>
                 i.customId === "resign_nim" && i.user.id === currentPlayer.id;
     
-            const moveCollector = channel.createMessageCollector({
+            let channel = interaction.channel as TextChannel;
+            const moveCollector = channel!.createMessageCollector({
                 filter: messageFilter,
                 time: this.MOVE_TIMEOUT,
             });
@@ -365,7 +363,7 @@ export default class Nim implements IBotInteraction {
                     const loser = currentPlayer.id === user1.id ? user2 : user1;
                     await this.updateEloRatings(
                         currentPlayer.id,
-                        loser.id == Bot.user!.id ? botProfile as string : loser.id,
+                        loser.id == Bot.user!.id ? botStrategy?.getName() || "Bot" : loser.id,
                         interaction,
                         Bot
                     );
@@ -404,7 +402,7 @@ export default class Nim implements IBotInteraction {
     
                 // The other player is the winner
                 const winner = currentPlayer.id === user1.id ? user2 : user1;
-                await this.updateEloRatings(winner.id == Bot.user!.id ? botProfile as string : winner.id, currentPlayer.id, interaction, Bot);
+                await this.updateEloRatings(winner.id == Bot.user!.id ? botStrategy?.getName() || "Bot" : winner.id, currentPlayer.id, interaction, Bot);
             });
     
             // ----- Handle collector end (timeout, etc.) -----
@@ -419,7 +417,7 @@ export default class Nim implements IBotInteraction {
                     );
     
                     const winner = currentPlayer.id === user1.id ? user2 : user1;
-                    await this.updateEloRatings(winner.id == Bot.user!.id ? botProfile as string : winner.id, currentPlayer.id, interaction, Bot);    
+                    await this.updateEloRatings(winner.id == Bot.user!.id ? botStrategy?.getName() || "Bot" : winner.id, currentPlayer.id, interaction, Bot);    
                 }
             });
     
@@ -454,21 +452,24 @@ export default class Nim implements IBotInteraction {
         botPlayer: User,
         user1: User,
         user2: User,
-        botProfile: BotProfile = BotProfile.Random
+        botStrategy?: NimBotStrategy
     ) {
         try {
-            const strategy = await BotStrategyFactory.getStrategy(botProfile);
+            if (!botStrategy) {
+                throw new Error("No bot strategy provided");
+            }
+            
             await new Promise(resolve => setTimeout(resolve, 1000));
     
-            const { pileIndex, sticksToRemove } = await strategy.makeMove(piles);
+            const { pileIndex, sticksToRemove } = await botStrategy.makeMove(piles);
             piles[pileIndex] -= sticksToRemove;
     
-            await interaction.followUp(`${botProfile} removed **${sticksToRemove}** stick(s) from pile **${pileIndex + 1}**.`);
+            await interaction.followUp(`${botStrategy.getName()} removed **${sticksToRemove}** stick(s) from pile **${pileIndex + 1}**.`);
     
             if (piles.every(p => p === 0)) {
-                await interaction.followUp(`${botProfile} took the last stick(s). ${botProfile} wins!`);
+                await interaction.followUp(`${botStrategy.getName()} took the last stick(s). ${botStrategy.getName()} wins!`);
                 await this.updateEloRatings(
-                    botProfile as string,
+                    botStrategy.getName(),
                     botPlayer.id === user1.id ? user2.id : user1.id,
                     interaction,
                     Bot
@@ -532,7 +533,9 @@ export default class Nim implements IBotInteraction {
             // Create and send the embed with pagination
             const embed = this.createLeaderboardEmbed(leaderboardData, 0, msg); // Start at page 0
             const buttons: any = this.createPaginationButtons(0);
-            await (msg.channel! as TextChannel).send({ embeds: [embed], components: [buttons]});
+            
+            let channel = msg.channel as TextChannel;
+            await channel!.send({ embeds: [embed], components: [buttons]});
     
             let currentPage = 0;
     
@@ -693,4 +696,3 @@ export default class Nim implements IBotInteraction {
 function swap(user1: User, user2: User): [User, User] {
     return Math.random() < 0.5 ? [user1, user2] : [user2, user1];
 }
-

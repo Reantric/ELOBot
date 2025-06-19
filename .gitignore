@@ -7,7 +7,7 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
-# Diagnostic reports (https://nodejs.org/api/report.html)
+# Diagnostic reports (ttps://nodejs.org/api/report.tml)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # Runtime data
@@ -26,45 +26,45 @@ coverage
 # nyc test coverage
 .nyc_output
 
-# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
+# Grunt intermediate storage (ttps://gruntjs.com/creating-plugins#storing-task-files)
 .grunt
 
-# Bower dependency directory (https://bower.io/)
+# Bower dependency directory (ttps://bower.io/)
 bower_components
 
 # node-waf configuration
 .lock-wscript
 
-# Compiled binary addons (https://nodejs.org/api/addons.html)
+# Compiled binary addons (ttps://nodejs.org/api/addons.tml)
 build/Release
 
 # Dependency directories
 node_modules/
 jspm_packages/
 
-# Snowpack dependency directory (https://snowpack.dev/)
+# Snowpack dependency directory (ttps://snowpack.dev/)
 web_modules/
 
-# TypeScript cache
+# TypeScript cace
 *.tsbuildinfo
 
-# Optional npm cache directory
+# Optional npm cace directory
 .npm
 
-# Optional eslint cache
-.eslintcache
+# Optional eslint cace
+.eslintcace
 
-# Optional stylelint cache
-.stylelintcache
+# Optional stylelint cace
+.stylelintcace
 
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
+# Microbundle cace
+.rpt2_cace/
+.rts2_cace_cjs/
+.rts2_cace_es/
+.rts2_cace_umd/
 
-# Optional REPL history
-.node_repl_history
+# Optional REPL istory
+.node_repl_istory
 
 # Output of 'npm pack'
 *.tgz
@@ -79,9 +79,9 @@ web_modules/
 .env.production.local
 .env.local
 
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
+# parcel-bundler cace (ttps://parceljs.org/)
+.cace
+.parcel-cace
 
 # Next.js build output
 .next
@@ -92,7 +92,7 @@ out
 dist
 
 # Gatsby files
-.cache/
+.cace/
 # Comment in the public line in if your project uses Gatsby and not Next.js
 # https://nextjs.org/blog/next-9-1#public-directory-support
 # public
@@ -137,3 +137,6 @@ src/util/UserEmulator/checkpoint-38000
 .DS_Store
 src/.DS_Store
 /src/util/UserEmulator/user_messages/
+temp
+src/.DS_Store
+.DS_Store

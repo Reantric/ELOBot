@@ -1,6 +1,12 @@
-import { BotStrategy } from "../../models/BotStrategy";
+import { NimBotStrategy } from "../../models/NimBotStrategy";
 
-export class RandomStrategy implements BotStrategy {
+export default class RandomStrategy implements NimBotStrategy {
+    getName(): string {
+        return "Random";
+    }
+    getDescription(): string {
+        return "A simple strategy that randomly selects a non-empty pile and removes a random number of sticks from it.";
+    }
     async makeMove(piles: number[]): Promise<{ pileIndex: number; sticksToRemove: number }> {
         // Select a random non-empty pile
         const nonEmptyPiles = piles

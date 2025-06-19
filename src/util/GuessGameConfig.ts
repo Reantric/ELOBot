@@ -9,8 +9,8 @@ export const GuessGameConfig = {
     /**
      * File paths for the message collections
      */
-    CHRIS_FILE_PATH: "/Users/monke/Desktop/ELOBot/src/util/UserEmulator/snow.txt",
-    LAYLA_FILE_PATH: "/Users/monke/Desktop/ELOBot/src/util/UserEmulator/moni.txt",
+    CHRIS_FILE_PATH: "/Users/monke/Desktop/ELOBot/src/util/UserEmulator/user_messages/snow.txt",
+    LAYLA_FILE_PATH: "/Users/monke/Desktop/ELOBot/src/util/UserEmulator/user_messages/moni.txt",
     
     /**
      * Display names for the users

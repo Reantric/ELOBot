@@ -1,5 +1,5 @@
 // ../../strategies/TwelvePlyStrategy.ts
-import { BotStrategy } from "../../models/BotStrategy";
+import { NimBotStrategy } from "../../models/NimBotStrategy";
 
 /**
  * Helper interface for returning a move.
@@ -13,16 +13,22 @@ interface Move {
  * A simple data structure to track whose turn it is.
  */
 enum PlayerTurn {
-    AI = "AI", 
+    AI = "AI",      // Our TwelvePly bot
     OPPONENT = "OPPONENT",
 }
 
-export class TwoPlyStrategy implements BotStrategy {
-    private readonly MAX_DEPTH = 2;
+export default class TwelvePlyStrategy implements NimBotStrategy {
+    private readonly MAX_DEPTH = 18;
     private cache: Map<string, number>; // Cache for memoization
 
     constructor() {
         this.cache = new Map<string, number>();
+    }
+    getName(): string {
+        return "12ply";
+    }
+    getDescription(): string {
+        return "An AI strategy that uses a 12-ply minimax algorithm with memoization to determine the best move in Nim.";
     }
 
     /**

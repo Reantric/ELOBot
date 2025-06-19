@@ -18,7 +18,7 @@ import * as glicko2 from "glicko2";
 var history = db.table('history');
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { readFileSync } from "fs";
-const genAI = new GoogleGenerativeAI("AIzaSyBv0y1ri9woqXzPouncQWZiH8fbxgGJZQo");
+const genAI = new GoogleGenerativeAI("AIzaSyDW6wzTNDIFhlmI_IFF9bacKLAKl1vOgj8");
 
 let Renderer = new rr()
 
@@ -223,8 +223,9 @@ export default class prob implements IBotInteraction {
 
 
     async runCommand(interaction: ChatInputCommandInteraction, Bot: Client): Promise<void> {
-        const hi: any[] = await randProb() as any[];
         await interaction.deferReply();
+        const hi: any[] = await randProb() as any[];
+   
         
         let probStatement = hi[0];
         let probAnswer = hi[1];
@@ -435,8 +436,20 @@ console.log("Ryan new volAOPSatility: " + p1.getvolAOPS());  */
 
 async fixLaTeX(prompt: string) {
     // For text-and-image input (multimodal), use the gemini-pro-vision model
-    const systemMessage = `I will give you some LaTeX for an AMC/AIME problem that may contain errors or unwanted characters (such as random HTML entities or the \begin{problem} environment). Please fix any errors so that it can be rendered correctly in LaTeX. Ensure that the output does not include the \begin{problem} environment or any other unnecessary environments, and that it does not introduce errors like LaTeX Warning: Command \~ invalid in math mode. Format the answer choices so that each one is on a new line, using $\\~\\$ to create a new line before the answer choices. Only provide the fixed LaTeX code so I can copy and paste it directly.`;
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" ,systemInstruction: systemMessage});
+    const systemMessage = `I will give you some LaTeX for an AMC/AIME problem that may contain errors, unwanted environments (such as \\begin{problem}), stray HTML entities, or incorrectly-used accent commands. Your job is to:
+
+• Remove any unnecessary environments, especially \\begin{problem}…\\end{problem}.  
+• Strip out all HTML entities and replace them with the correct LaTeX (e.g. \\\`&nbsp;\\\` → ~, \\\`&#8211;\\\` → --).  
+• Escape or correct any special characters (%, _, &, #) so the code compiles without error.  
+• Fix any accent commands: in math mode use \\tilde{…}/\\widehat{…}, in text mode use \\~{…}/\\^{…}.  
+• Ensure all dollar signs, braces, and brackets are balanced.  
+• Format the answer choices so each appears on its own line, preceded by \\\`\\\\~\\\\\\\`.  
+• Preserve all original textual content (words, punctuation, macros like \\textbf) exactly, only adjusting LaTeX syntax.  
+• Do NOT wrap your output in code blocks or add any commentary—just output the clean, fixed LaTeX source.
+
+Only provide the raw LaTeX code ready for copy-and-paste.`;
+;
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" ,systemInstruction: systemMessage});
 
     const imageParts = [
         //fileToGenerativePart("image1.png", "image/png"),
@@ -446,13 +459,14 @@ async fixLaTeX(prompt: string) {
     const result = await model.generateContent([prompt]);
     const response = await result.response;
     const text = response.text();
+   // console.log("The fixed LaTeX: " + text);
     return text;
 }
 
 async getHint(problem: string, soln: string) {
     // For text-and-image input (multimodal), use the gemini-pro-vision model
     const systemMessage = "You will be given an AMC/AIME problem and its solution, and your task is to generate a hint for the problem. It should be relevant to the problem and solution and be helpful to someone struggling with the problem. It should be at most 10 words.";
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" ,systemInstruction: systemMessage});
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" ,systemInstruction: systemMessage});
 
     const imageParts = [
         //fileToGenerativePart("image1.png", "image/png"),
@@ -468,7 +482,7 @@ async getHint(problem: string, soln: string) {
 async getTags(problem: string, soln: string) {
     // For text-and-image input (multimodal), use the gemini-pro-vision model
     const systemMessage = "You will be given an AMC/AIME problem and its solution, and your task is to generate a list of tags for the problem. They should be relevant to the problem and solution and not be superfluous like contest-math. There should be 5 tags max.";
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" ,systemInstruction: systemMessage});
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" ,systemInstruction: systemMessage});
 
     const imageParts = [
         //fileToGenerativePart("image1.png", "image/png"),

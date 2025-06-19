@@ -3,15 +3,15 @@ import { IBotInteraction } from "../api/capi";
 import { QuickDB } from "quick.db";
 
 const db = new QuickDB();
-const statsTable = db.table('random_guess_stats');
+const statsTable = db.table('guess_stats');
 
-export default class guessstats implements IBotInteraction {
+export default class snowmonistats implements IBotInteraction {
     name(): string {
-        return "guessstats";
+        return "snowmonistats";
     }
 
     help(): string {
-        return "View your random user guessing game statistics";
+        return "View your Chris vs Layla guessing game statistics";
     }
 
     cooldown(): number {
@@ -19,7 +19,7 @@ export default class guessstats implements IBotInteraction {
     }
 
     isThisInteraction(command: string): boolean {
-        return command === "guessstats";
+        return command === "snowmonistats";
     }
 
     data(): any {
@@ -49,21 +49,21 @@ export default class guessstats implements IBotInteraction {
         
         const embed = new EmbedBuilder()
             .setAuthor({ 
-                name: `${targetUser.username}'s Random Guess Statistics`, 
+                name: `${targetUser.username}'s Guess Statistics`, 
                 iconURL: targetUser.displayAvatarURL() 
             })
-            .setColor("#9b59b6")
+            .setColor("#3498db")
             .addFields(
                 { name: 'Total Guesses', value: total.toString(), inline: true },
                 { name: 'Correct Guesses', value: correct.toString(), inline: true },
                 { name: 'Accuracy', value: `${percentage}%`, inline: true }
             )
-            .setFooter({ text: 'Random User Challenge - Who wrote it?' })
+            .setFooter({ text: 'Snow vs Moni - Who wrote it?' })
             .setTimestamp();
 
         // Add a note to try the game if they haven't played yet
         if (total === 0) {
-            embed.setDescription('Try playing the game with `/query` to start building your stats!');
+            embed.setDescription('Try playing the game with `/guess` to start building your stats!');
         }
 
         await interaction.reply({ embeds: [embed] });
