@@ -105,7 +105,8 @@ export default class amogML implements IBotEvent {
                 const msgChannel: Discord.Channel = Bot.channels.cache.get(msgList[0].channel) as Discord.Channel;
                 if (msgChannel instanceof Discord.TextChannel){
                     console.log("Generating response...");
-                    channel.sendTyping(); // Simulate typing
+                    console.log("BOt has token [amogML]: " + Bot.token);
+                    await channel.sendTyping(); // Simulate typing 
                     console.log(this.cleanup(msgList.map(message => message.content),msgChannel.name,Bot));
                     generateResponse(this.cleanup(msgList.map(message => message.content),msgChannel.name,Bot)).then((response) => {
                     msg.reply(`${v}${this.cleandown(response,Bot)}`);

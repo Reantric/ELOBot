@@ -1,7 +1,7 @@
 import { NimBotStrategy } from "../../models/NimBotStrategy";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { readFileSync } from "fs";
-const genAI = new GoogleGenerativeAI("AIzaSyDW6wzTNDIFhlmI_IFF9bacKLAKl1vOgj8");
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export default class GeminiStrategy implements NimBotStrategy {
     private model;

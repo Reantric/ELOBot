@@ -1,3 +1,5 @@
+import {config} from 'dotenv';
+
 import { ButtonInteraction, Client, Events, Guild, GuildMember, MessageReaction, PartialMessageReaction, PartialUser, Partials, User } from 'discord.js';
 import { RoleManager, GuildChannelManager } from 'discord.js';
 import { ApplicationCommand, ApplicationCommandPermissions } from 'discord.js';
@@ -17,7 +19,6 @@ import { IBotEvent } from "./api/eapi";
 import { setupInfo } from './setup.js';
 import { secrets } from './config';
 
-import {config} from 'dotenv';
 import { resolve } from 'path'; // Ensure path is imported
 import { IBotReact } from './api/rapi';
 import Connect4 from './commands/connect4';
@@ -109,10 +110,12 @@ async function init() {
     })
 }
 
-Bot.once("ready", async () => {
+Bot.once(Events.ClientReady, async () => {
     console.log("This bot is online!");
     await init();
 
+    // Send a message to the channel with ID 1379913904884289556 in 
+   // and guildID = setupInfo.guildID
     Bot.user!.setPresence({ 
         activities: [{ 
             name: 'Sir Amog', 
@@ -181,7 +184,7 @@ Bot.on("guildMemberAdd", member => {
 
 Bot.on("interactionCreate", async (interaction: Interaction) => {
    // console.log("I fired...",interaction.isCommand());
-	if (!interaction.isCommand()) return;
+   if (!interaction.isCommand()) return;
     try {
         handleCommand(interaction);
     } catch (e) {
@@ -194,7 +197,10 @@ async function handleButtonPress(interaction: ButtonInteraction){
 }
 
 Bot.on("messageCreate", msg => {
-    if (msg.author.bot && msg.author.id != '432610292342587392' && msg.author.id != '237844886030778368') return;
+  //  console.log("BOt has token [EVENTHANDLEPRE]: " + msg.client.token);
+  //  Bot.login(process.env.TOKEN) 
+
+    if (msg.author.bot && msg.author.id != '432610292342587392' && msg.author.id != '237844886030778368' && msg.author.id != '885542468693676054') return;
     handleEvent(msg); // checks every message regardless of what it contains
     if (msg.channel.type == ChannelType.DM){
         msg.author.send(`Please talk to me on a server! This ensures more engagement and reliability.`);
@@ -240,7 +246,7 @@ Bot.on("guildCreate",async guild => {
 
 async function handleEvent(msg: Message){
     for (const eventClass of events){
-        await eventClass.runEvent(msg,Bot);
+        await eventClass.runEvent(msg,msg.client);
     }
 }
 
@@ -322,7 +328,6 @@ async function loadCommands(commandsPath: string, allSlashCommands: Collection<S
         commandDatas.push(command.data().toJSON());
     }
     
-
     const rest: REST = new REST({ version: '10' }).setToken(process.env.TOKEN!);
     
      (async () => {
@@ -333,7 +338,6 @@ async function loadCommands(commandsPath: string, allSlashCommands: Collection<S
                 Routes.applicationGuildCommands(process.env.CLIENT_ID!, setupInfo.guildID),
                 { body: commandDatas},
             );
-
             console.log('Successfully reloaded application (/) commands.');
         } catch (error) {
             console.error(error);
@@ -363,7 +367,7 @@ async function loadReacts(commandsPath: string){
     }
 }
 
-Bot.login(process.env.TOKEN!);
+await Bot.login(process.env.TOKEN!);
 
 async function initIntelligentAgents(){
     db.has("Random").then((a: any) => {

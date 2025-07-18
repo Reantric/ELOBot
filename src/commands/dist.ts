@@ -353,7 +353,7 @@ let john= new Promise<void>((resolve,reject) => {
         
           const file = new AttachmentBuilder('dist/temp/senti.png'); // replace with your file's path
           interaction.editReply({ content: `Sample size: ${count}`, files: [file] });}
-          ,5000);
+          ,12000);
       });
     
     
