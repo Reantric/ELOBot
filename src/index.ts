@@ -122,7 +122,7 @@ Bot.once(Events.ClientReady, async () => {
             type: ActivityType.Watching 
         }], 
         status: 'online' });
-    Bot.user?.setUsername("Linty");
+    //Bot.user?.setUsername("Linty"); <-- THIS LINE CAUSED THE TOKEN ISSUE
    // Bot.guilds.cache.find(guild => guild.id == '1029199405657620500')?.setName("polaris' best friend!");
 
     questionId.set("id", 0);
@@ -166,7 +166,7 @@ Bot.once(Events.ClientReady, async () => {
             
         })
     })
-    })
+});
 
     
 Bot.on("guildMemberAdd", member => {
@@ -197,8 +197,12 @@ async function handleButtonPress(interaction: ButtonInteraction){
 }
 
 Bot.on("messageCreate", msg => {
-  //  console.log("BOt has token [EVENTHANDLEPRE]: " + msg.client.token);
-  //  Bot.login(process.env.TOKEN) 
+    console.log("BOt has token [EVENTHANDLEPRE]: " + msg.client.token);
+   // Bot.login(process.env.TOKEN) 
+
+   if (msg.content.toLowerCase() === '!hi') {
+        msg.reply('hello');
+    }
 
     if (msg.author.bot && msg.author.id != '432610292342587392' && msg.author.id != '237844886030778368' && msg.author.id != '885542468693676054') return;
     handleEvent(msg); // checks every message regardless of what it contains
