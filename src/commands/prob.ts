@@ -18,7 +18,7 @@ import * as glicko2 from "glicko2";
 var history = db.table('history');
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { readFileSync } from "fs";
-const genAI = new GoogleGenerativeAI("AIzaSyDW6wzTNDIFhlmI_IFF9bacKLAKl1vOgj8");
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 let Renderer = new rr()
 

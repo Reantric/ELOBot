@@ -267,7 +267,7 @@ function simRating(k, yr) {
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { readFileSync } from "fs";
-const genAI = new GoogleGenerativeAI("AIzaSyBv0y1ri9woqXzPouncQWZiH8fbxgGJZQo");
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY_2);
 
 export async function randProb(){
   

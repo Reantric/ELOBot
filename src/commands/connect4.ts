@@ -1,4 +1,4 @@
-import { Client, CommandInteraction, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, User, MessageComponentInteraction, TextChannel, ButtonInteraction, Interaction } from "discord.js";
+import { Client, ChatInputCommandInteraction,CommandInteraction, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, User, MessageComponentInteraction, TextChannel, ButtonInteraction, Interaction } from "discord.js";
 import { IBotInteraction } from "../api/capi";
 import { SlashCommandBuilder } from '@discordjs/builders';
 import sharp from 'sharp';
@@ -56,7 +56,7 @@ export default class Connect4 implements IBotInteraction {
         return 'both';
     }
 
-    async runCommand(interaction: CommandInteraction, Bot: Client): Promise<void> {
+    async runCommand(interaction: ChatInputCommandInteraction, Bot: Client): Promise<void> {
         await interaction.deferReply();
 
         const opponent = interaction.options.get('opponent')?.user as User | undefined;

@@ -27,7 +27,6 @@ export default class naughty implements IBotEvent {
     async runEvent(msg: Discord.Message, Bot: Discord.Client): Promise<void> {
         if (!msg.channel.isTextBased()) return;
         let channel = msg.channel as Discord.TextChannel;
-        
         if (msg.content.toLowerCase().includes("say fundamental theorem of abelian groups but")) {
             try {
                 // Delete the original message
