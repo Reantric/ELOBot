@@ -42,7 +42,7 @@ perms(): "admin" | "user" | "both" {
 
   async runCommand(interaction: CommandInteraction, Bot: Client): Promise<void> {
     
-    
+    return;
 
 
     // Assuming you've declared and initialized your arrays and 'db' correctly.

@@ -7,6 +7,8 @@ const db = new QuickDB();
 var standings = db.table('rank');
 var history = db.table('history');
 var MLonMG = db.table('MLonMG');
+var channelLogs = db.table('channelLogs');
+var channelPromptLog = db.table('channelPromptLog');
 // @ts-ignore
 import * as glicko2 from "glicko2";
 import { generateResponse } from "../util/UserEmulator/eval.js";
@@ -40,6 +42,27 @@ export default class amogML implements IBotEvent {
         }).join("\n") + "\n";
     }
 
+    private sanitizeContent(msg: string, Bot: Discord.Client): string {
+        let cleaned = msg.replace(/<:([^:]+):\d+>/g, ':$1:');
+        cleaned = cleaned.replace(/<@!?(\d+)>/g, (match, userId) => {
+            const user = Bot.users.cache.get(userId);
+            return user ? `@${user.username}` : match;
+        });
+        return cleaned;
+    }
+
+    private async buildPromptForChannel(channel: Discord.TextChannel, Bot: Discord.Client): Promise<string> {
+        type LoggedMessage = { userId: string; content: string };
+        const allLogs: LoggedMessage[] = (await channelLogs.get(channel.id)) || [];
+        const maxMessages = 5; // use only the last 5 messages
+        const recent = allLogs.slice(-maxMessages);
+        const header = `<CHAN:${channel.name}>`;
+        const body = recent.map(m => `
+<USR:${m.userId}> ${this.sanitizeContent(m.content, Bot)} <EOM>`).join("");
+        const completion = `\n<USR:260118674306760705>\n\n### Completion:\n<USR:260118674306760705>`;
+        return header + body + completion;
+    }
+    
     /**
      * Replaces emoji tokens (e.g. :kekw:) in the text with the corresponding emoji from the guild.
      * If an emoji is not found, it leaves the text as is.
@@ -57,12 +80,23 @@ export default class amogML implements IBotEvent {
     
     
     async runEvent(msg: Discord.Message, Bot: Discord.Client): Promise<void> {
-       if (msg.author.bot || !msg.channel.isTextBased()) return;
-       if (msg.channel.id != '1379913904884289556') return; // Only listen to messages in the specific channel
+       if (!msg.channel.isTextBased()) return;
 
        let channel = msg.channel as Discord.TextChannel;
       // if (msg.guild!.id != '838203182630305822') return;
       //console.log(msg.content);
+
+        // Append every message to per-channel logs
+        try {
+            const existing: { userId: string; content: string }[] = (await channelLogs.get(channel.id)) || [];
+            existing.push({ userId: msg.author.id, content: msg.content });
+            await channelLogs.set(channel.id, existing);
+        } catch (e) {
+            console.error('Failed to append to channelLogs:', e);
+        }
+
+        // Do not respond to bot messages (including self), but they are logged above
+        if (msg.author.bot) return;
 
         let msgList: { content: string, channel: string }[] = (await MLonMG.get(msg.author.id)) || [];
         
@@ -107,8 +141,16 @@ export default class amogML implements IBotEvent {
                     console.log("Generating response...");
                     console.log("BOt has token [amogML]: " + Bot.token);
                     await channel.sendTyping(); // Simulate typing 
-                    console.log(this.cleanup(msgList.map(message => message.content),msgChannel.name,Bot));
-                    generateResponse(this.cleanup(msgList.map(message => message.content),msgChannel.name,Bot)).then((response) => {
+                    const prompt = await this.buildPromptForChannel(channel, Bot);
+                    console.log(prompt);
+                    try {
+                        const existingPrompts: string[] = (await channelPromptLog.get(channel.id)) || [];
+                        existingPrompts.push(prompt);
+                        await channelPromptLog.set(channel.id, existingPrompts);
+                    } catch (e) {
+                        console.error('Failed to log prompt:', e);
+                    }
+                    generateResponse(prompt).then((response) => {
                     msg.reply(`${v}${this.cleandown(response,Bot)}`);
             });
         }
