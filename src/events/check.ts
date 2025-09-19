@@ -105,7 +105,7 @@ export default class check implements IBotEvent {
             .setAuthor({name: msg.author!.username, iconURL: msg.author!.avatarURL()!})
            // .setImage('https://i.redd.it/l28662sbcec51.png')
             .setTimestamp()
-            .setThumbnail('https://i.imgur.com/aowYZQG.jpeg');
+            .setThumbnail('https://i.imgur.com/diav5WK.png');
 
         for (var i = begint; i <= endt; ++i) {
             let username: any = userArray[i][0];

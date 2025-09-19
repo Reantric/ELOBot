@@ -39,6 +39,7 @@ config({ path: resolve(__dirname, '../.env') }); // Adjust the relative path acc
 import { QuickDB } from "quick.db";
 import { NimBotStrategyFactory } from './util/NimBSFactory.js';
 import { Connect4StrategyFactory } from './util/Connect4BSFactory.js';
+import { startPendingOrderWatcher } from './util/trading/trades.js';
 const db = new QuickDB();
 
 var userBehavior = db.table('user');
@@ -116,6 +117,7 @@ async function init() {
 Bot.once(Events.ClientReady, async () => {
     console.log("This bot is online!");
     await init();
+    startPendingOrderWatcher();
 
     // Send a message to the channel with ID 1379913904884289556 in 
    // and guildID = setupInfo.guildID

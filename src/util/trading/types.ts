@@ -5,8 +5,8 @@ export type TradeSide = 'BUY' | 'SELL';
 export interface PositionBase {
     assetType: AssetType;
     symbol: string;
-    quantity: number; // Shares or contracts (positive only for longs)
-    avgCost: number; // Per-share/contract cost basis
+    quantity: number; // Shares or contracts (positive for longs, negative for shorts)
+    avgCost: number; // Per-share/contract cost basis (absolute entry price)
 }
 
 export interface EquityPosition extends PositionBase {
@@ -29,6 +29,7 @@ export type Position = EquityPosition | OptionPosition;
 
 export interface PendingOptionOrder {
     id: string;
+    assetType: 'OPTION';
     userId: string;
     symbol: string;
     expiration: string;
@@ -43,6 +44,22 @@ export interface PendingOptionOrder {
     fillPrice?: number;
     filledAt?: number;
 }
+
+export interface PendingEquityOrder {
+    id: string;
+    assetType: 'EQUITY';
+    userId: string;
+    symbol: string;
+    side: TradeSide;
+    limitPrice: number;
+    quantity: number;
+    createdAt: number;
+    status: 'OPEN' | 'FILLED';
+    fillPrice?: number;
+    filledAt?: number;
+}
+
+export type PendingOrder = PendingOptionOrder | PendingEquityOrder;
 
 export interface Trade {
     id: string;
@@ -86,7 +103,9 @@ export interface TradingAccount {
     twrFactors: number[];
     settings: AccountSettings;
     lastMark?: number;
-    pendingOrders: PendingOptionOrder[];
+    pendingOrders: PendingOrder[];
+    mockSeeded?: boolean;
+    testAccountInitialized?: boolean;
 }
 
 export interface PriceQuote {

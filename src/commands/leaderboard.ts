@@ -38,7 +38,7 @@ export default class Leaderboard implements IBotInteraction {
             .setDescription('💀 Here are the top Fuckers who have the highest Ratings!? 💀 ')
             .setAuthor({ name: interaction.user.username, iconURL: interaction.user.avatarURL() ?? undefined })
             .setTimestamp()
-            .setThumbnail('https://i.imgur.com/aowYZQG.jpeg');
+            .setThumbnail('https://i.imgur.com/diav5WK.png');
 
         for (let i = begin; i <= end; i += 1) {
             const row = entries[i];
@@ -224,7 +224,7 @@ export default class Leaderboard implements IBotInteraction {
             .setAuthor({name: interaction.user!.username, iconURL: interaction.user!.avatarURL()!})
            // .setImage('https://i.redd.it/l28662sbcec51.png')
             .setTimestamp()
-            .setThumbnail('https://i.imgur.com/aowYZQG.jpeg');
+            .setThumbnail('https://i.imgur.com/diav5WK.png');
 
         for (var i = begint; i <= endt; ++i) {
             let username: any = userArray[i][0];

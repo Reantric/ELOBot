@@ -1,8 +1,8 @@
-import { ensureAccount, saveAccount, TEST_ACCOUNT_ID } from './dataStore.js';
+import { ensureAccount, saveAccount, TEST_ACCOUNT_ID, removePosition } from './dataStore.js';
 import { processPendingOrders } from './trades.js';
 import { getOptionChain, getQuote, getRiskFreeRate } from './marketData.js';
 import { bsGreeks, bsPrice, impliedVol } from './pricing.js';
-import { timeToExpiry } from './time.js';
+import { startOfDayUtc, toDate, timeToExpiry } from './time.js';
 import {
     EquityPosition,
     Greeks,
@@ -43,7 +43,10 @@ export async function markToMarket(userId: string, force = false): Promise<Portf
     const pendingResult = await processPendingOrders(account);
     account = pendingResult.account;
 
-    if (userId === TEST_ACCOUNT_ID && (account as any).mockSeeded && account.netWorthHistory.length > 0) {
+    const quoteCache = new Map<string, number>();
+    await settleExpiredOptions(account, quoteCache);
+
+    if (userId === TEST_ACCOUNT_ID && account.mockSeeded && account.netWorthHistory.length > 0) {
         const latest = account.netWorthHistory[account.netWorthHistory.length - 1];
         const positionsValue = latest.positionsValue ?? 0;
 
@@ -65,7 +68,6 @@ export async function markToMarket(userId: string, force = false): Promise<Portf
     }
 
     const snapshots: PositionSnapshot[] = [];
-    const quoteCache = new Map<string, number>();
     let positionsValue = 0;
     let unrealized = 0;
 
@@ -181,14 +183,17 @@ async function recordNetWorth(account: TradingAccount, positionsValue: number, n
     const previous = history.length > 0 ? history[history.length - 1] : undefined;
     const baseNetWorth = history.length > 0 ? history[0].netWorth : netWorth;
 
-    const cumulativeReturn = baseNetWorth > 0 ? (netWorth / baseNetWorth) - 1 : 0;
-    const dailyReturn = previous && previous.netWorth > 0 ? (netWorth - previous.netWorth) / previous.netWorth : 0;
+    const baseReturn = baseNetWorth > 0 ? (netWorth / baseNetWorth) - 1 : 0;
+    const dailyReturn = previous && previous.netWorth > 0
+        ? (netWorth - previous.netWorth) / previous.netWorth
+        : baseReturn;
 
     if (previous) {
-        account.twr = ((account.twr + 1) * (dailyReturn + 1)) - 1;
+        const priorTwr = Number.isFinite(account.twr) ? account.twr : (previous.cumulativeReturn ?? 0);
+        account.twr = ((priorTwr + 1) * (dailyReturn + 1)) - 1;
         account.twrFactors = [...(account.twrFactors ?? []), 1 + dailyReturn].slice(-1000);
     } else {
-        account.twr = 0;
+        account.twr = baseReturn;
         account.twrFactors = [];
     }
 
@@ -199,7 +204,7 @@ async function recordNetWorth(account: TradingAccount, positionsValue: number, n
         netWorth,
         realizedPnl: account.realizedPnl,
         dailyReturn,
-        cumulativeReturn,
+        cumulativeReturn: account.twr,
         twr: account.twr,
     };
 
@@ -228,4 +233,48 @@ function buildValuation(
         twr: account.twr,
         snapshots,
     };
+}
+
+async function settleExpiredOptions(account: TradingAccount, quoteCache: Map<string, number>): Promise<void> {
+    const today = startOfDayUtc(new Date());
+    const optionEntries = Object.entries(account.positions);
+    let mutated = false;
+
+    for (const [key, position] of optionEntries) {
+        if (!position || position.assetType !== 'OPTION') {
+            continue;
+        }
+        const expiryDate = startOfDayUtc(toDate(position.expiration));
+        if (expiryDate > today) {
+            continue;
+        }
+
+        const underlying = position.symbol.toUpperCase();
+        let underlyingPrice = quoteCache.get(underlying);
+        if (underlyingPrice == null) {
+            const quote = await getQuote(underlying);
+            underlyingPrice = quote.price;
+            quoteCache.set(underlying, underlyingPrice);
+        }
+
+        const intrinsic = position.right === 'CALL'
+            ? Math.max(0, underlyingPrice - position.strike)
+            : Math.max(0, position.strike - underlyingPrice);
+
+        const multiplier = position.multiplier ?? account.settings.optionMultiplier ?? 100;
+        const contracts = position.quantity;
+        const payoff = intrinsic * multiplier * contracts;
+        const costBasis = position.avgCost * multiplier * contracts;
+
+        account.cash += payoff;
+        account.buyingPower = account.cash;
+        account.realizedPnl += payoff - costBasis;
+        removePosition(account, 'OPTION', position.symbol, position.contractSymbol);
+        mutated = true;
+    }
+
+    if (mutated) {
+        // ensure no stale references remain
+        account.positions = { ...account.positions };
+    }
 }

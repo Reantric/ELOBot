@@ -2,6 +2,7 @@ import { SlashCommandBuilder } from '@discordjs/builders';
 import { ChatInputCommandInteraction, Client, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, Interaction } from 'discord.js';
 import { IBotInteraction } from '../api/capi';
 import { markToMarket } from '../util/trading/portfolio.js';
+import type { PendingOrder } from '../util/trading/types.js';
 import { formatCurrency, formatNumber, formatPercentage } from '../util/trading/view.js';
 
 export default class Positions implements IBotInteraction {
@@ -67,33 +68,68 @@ export default class Positions implements IBotInteraction {
             }
 
             const pending = valuation.account.pendingOrders ?? [];
-            const components = pending.length > 0
-                ? [new ActionRowBuilder<ButtonBuilder>().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`positions_pending_${interaction.id}`)
-                        .setLabel('View Pending Orders')
-                        .setStyle(ButtonStyle.Secondary)
-                )]
-                : [];
 
-            await interaction.editReply({ embeds: [embed], components });
+            const makeRow = (viewDisabled: boolean, returnDisabled: boolean) => new ActionRowBuilder<ButtonBuilder>().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`positions_pending_${interaction.id}`)
+                    .setLabel('View Pending Orders')
+                    .setStyle(ButtonStyle.Secondary)
+                    .setDisabled(viewDisabled),
+                new ButtonBuilder()
+                    .setCustomId(`positions_return_${interaction.id}`)
+                    .setLabel('Return to Positions')
+                    .setStyle(ButtonStyle.Primary)
+                    .setDisabled(returnDisabled),
+            );
 
-            if (pending.length > 0) {
-                const filter = (i: Interaction) => i.isButton() && i.customId === `positions_pending_${interaction.id}` && i.user.id === interaction.user.id;
-                const collector = interaction.channel?.createMessageComponentCollector({ filter, time: 60_000, max: 1 });
-                collector?.on('collect', async button => {
-                    const list = pending.map(order => {
-                        const ts = new Date(order.createdAt).toLocaleString('en-US', { hour12: false });
-                        return `${order.side} ${order.symbol} ${order.expiration} ${order.right} ${order.strike} • Qty ${order.quantity} @ ${formatCurrency(order.limitPrice)} • Placed ${ts}`;
-                    }).join('\n');
-                    await button.reply({ ephemeral: true, content: list || 'No pending orders.' });
-                });
-                collector?.on('end', () => {
-                    interaction.editReply({ components: [] }).catch(() => undefined);
-                });
-            }
+            let currentComponents = [makeRow(false, true)];
+            await interaction.editReply({ embeds: [embed], components: currentComponents });
+
+            const filter = (i: Interaction) => i.isButton()
+                && (i.customId === `positions_pending_${interaction.id}` || i.customId === `positions_return_${interaction.id}`)
+                && i.user.id === interaction.user.id;
+            const collector = interaction.channel?.createMessageComponentCollector({ filter, time: 120_000 });
+
+            collector?.on('collect', async button => {
+                await button.deferUpdate();
+                if (button.customId === `positions_pending_${interaction.id}`) {
+                    currentComponents = [makeRow(true, false)];
+                    const pendingEmbed = this.buildPendingEmbed(interaction, pending);
+                    await interaction.editReply({ embeds: [pendingEmbed], components: currentComponents });
+                    return;
+                }
+
+                currentComponents = [makeRow(false, true)];
+                await interaction.editReply({ embeds: [embed], components: currentComponents });
+            });
+
+            collector?.on('end', async () => {
+                await interaction.editReply({ components: currentComponents }).catch(() => undefined);
+            });
         } catch (error: any) {
             await interaction.editReply({ content: `❌ Failed to load positions: ${error.message ?? error}` });
         }
+    }
+
+    private buildPendingEmbed(interaction: ChatInputCommandInteraction, pending: PendingOrder[]): EmbedBuilder {
+        const embed = new EmbedBuilder()
+            .setTitle(`${interaction.user.username}'s Pending Orders`)
+            .setColor(0xf1c40f);
+
+        if (pending.length === 0) {
+            embed.setDescription('No pending orders.');
+            return embed;
+        }
+
+        const lines = pending.map(order => {
+            const placed = new Date(order.createdAt).toLocaleString('en-US', { hour12: false });
+            if (order.assetType === 'OPTION') {
+                return `${order.side} ${order.symbol} ${order.expiration} ${order.right} ${formatNumber(order.strike, 2)} • Qty ${order.quantity} @ ${formatCurrency(order.limitPrice)} • Placed ${placed}`;
+            }
+            return `${order.side} ${order.symbol} • Qty ${order.quantity} @ ${formatCurrency(order.limitPrice)} • Placed ${placed}`;
+        });
+
+        embed.setDescription(lines.join('\n').slice(0, 4096));
+        return embed;
     }
 }

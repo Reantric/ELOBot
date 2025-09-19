@@ -9,10 +9,12 @@ import {
     NetWorthSnapshot,
     Position,
     OptionPosition,
+    PendingOrder,
+    PendingEquityOrder,
+    PendingOptionOrder,
     TradingAccount,
     Trade,
     TradeSide,
-    PendingOptionOrder,
 } from './types.js';
 
 const db = new QuickDB();
@@ -68,6 +70,8 @@ function newAccount(userId: string): TradingAccount {
         settings: deepClone(DEFAULT_SETTINGS),
         lastMark: timestamp,
         pendingOrders: [],
+        mockSeeded: false,
+        testAccountInitialized: false,
     };
 }
 
@@ -75,6 +79,12 @@ function migrateAccount(raw: any, userId: string): TradingAccount {
     if (!raw) {
         return newAccount(userId);
     }
+
+    const pendingOrders = Array.isArray(raw.pendingOrders)
+        ? raw.pendingOrders
+            .map(normalizePendingOrder)
+            .filter((order: PendingOrder | null): order is PendingOrder => order != null)
+        : [];
 
     const account: TradingAccount = {
         userId,
@@ -92,7 +102,9 @@ function migrateAccount(raw: any, userId: string): TradingAccount {
             riskFreeRate: raw?.settings?.riskFreeRate ?? DEFAULT_SETTINGS.riskFreeRate,
         },
         lastMark: raw.lastMark ?? Date.now(),
-        pendingOrders: raw.pendingOrders ?? [],
+        pendingOrders,
+        mockSeeded: raw?.mockSeeded === true,
+        testAccountInitialized: raw?.testAccountInitialized === true,
     };
 
     if (!Array.isArray(account.netWorthHistory) || account.netWorthHistory.length === 0) {
@@ -187,6 +199,35 @@ export function removePosition(account: TradingAccount, assetType: AssetType, sy
     return account;
 }
 
+export function ensureLiveTradingState(account: TradingAccount): boolean {
+    if (!account.mockSeeded) {
+        return false;
+    }
+
+    account.mockSeeded = false;
+    if (!Array.isArray(account.netWorthHistory) || account.netWorthHistory.length === 0) {
+        const timestamp = Date.now();
+        const baselineCash = account.cash;
+        account.netWorthHistory = [{
+            timestamp,
+            cash: baselineCash,
+            positionsValue: 0,
+            netWorth: baselineCash,
+            realizedPnl: account.realizedPnl ?? 0,
+            dailyReturn: 0,
+            cumulativeReturn: 0,
+            twr: 0,
+        }];
+        account.twr = 0;
+        account.twrFactors = [];
+        account.lastMark = timestamp;
+    } else {
+        const last = account.netWorthHistory[account.netWorthHistory.length - 1];
+        account.lastMark = last.timestamp ?? Date.now();
+    }
+    return true;
+}
+
 export function appendTrade(account: TradingAccount, trade: Trade): TradingAccount {
     account.tradeHistory.unshift(trade);
     if (account.tradeHistory.length > 2000) {
@@ -203,50 +244,109 @@ export async function resetAccount(userId: string): Promise<TradingAccount> {
 
 export { DEFAULT_SETTINGS, TEST_ACCOUNT_ID };
 
+function normalizePendingOrder(order: any): PendingOrder | null {
+    if (!order) {
+        return null;
+    }
+
+    const inferredType = order.assetType === 'EQUITY' ? 'EQUITY' : order.assetType === 'OPTION' ? 'OPTION'
+        : (order.strike != null ? 'OPTION' : 'EQUITY');
+
+    const limitPrice = Number(order.limitPrice);
+    const quantity = Math.floor(Number(order.quantity ?? 0));
+    const createdAt = typeof order.createdAt === 'number' ? order.createdAt : Date.now();
+    const fillPrice = Number(order.fillPrice);
+    const filledAt = typeof order.filledAt === 'number' ? order.filledAt : undefined;
+
+    if (!Number.isFinite(limitPrice) || !Number.isFinite(quantity) || quantity <= 0) {
+        return null;
+    }
+
+    const base = {
+        id: typeof order.id === 'string' ? order.id : randomUUID(),
+        userId: typeof order.userId === 'string' ? order.userId : '',
+        symbol: typeof order.symbol === 'string' ? order.symbol.toUpperCase() : '',
+        side: order.side === 'SELL' ? 'SELL' as TradeSide : 'BUY' as TradeSide,
+        limitPrice,
+        quantity,
+        createdAt,
+        status: order.status === 'FILLED' ? 'FILLED' as const : 'OPEN' as const,
+        fillPrice: Number.isFinite(fillPrice) ? fillPrice : undefined,
+        filledAt,
+    };
+
+    if (!base.userId || !base.symbol) {
+        return null;
+    }
+
+    if (inferredType === 'OPTION') {
+        const expiration = typeof order.expiration === 'string' ? order.expiration : undefined;
+        const strike = Number(order.strike);
+        const right = order.right === 'PUT' ? 'PUT' as const : 'CALL' as const;
+        const multiplier = Math.floor(Number(order.multiplier ?? DEFAULT_SETTINGS.optionMultiplier)) || DEFAULT_SETTINGS.optionMultiplier;
+        if (!expiration || !Number.isFinite(strike)) {
+            return null;
+        }
+        const normalized: PendingOptionOrder = {
+            ...base,
+            assetType: 'OPTION',
+            expiration,
+            strike,
+            right,
+            multiplier,
+        };
+        return normalized;
+    }
+
+    const normalized: PendingEquityOrder = {
+        ...base,
+        assetType: 'EQUITY',
+    };
+    return normalized;
+}
+
 function seedTestAccount(account: TradingAccount) {
     if (account.userId !== TEST_ACCOUNT_ID) {
         return;
     }
 
-    if ((account as any).mockSeeded) {
+    const twrSeries = loadTwrSeries();
+    if (twrSeries.length === 0) {
         return;
     }
 
     const initialCash = account.settings.initialCash ?? DEFAULT_SETTINGS.initialCash;
-    account.cash = initialCash;
-    account.buyingPower = initialCash;
-    account.positions = {};
-    account.tradeHistory = [];
+    const seededSnapshots = buildTwrSnapshots(initialCash, account.realizedPnl ?? 0, twrSeries);
+    const hasSeededHistory = Array.isArray(account.netWorthHistory)
+        && account.netWorthHistory.length >= seededSnapshots.length
+        && seededSnapshots.every((snapshot, index) => account.netWorthHistory?.[index]?.timestamp === snapshot.timestamp);
 
-    const twrSeries = loadTwrSeries();
-    if (twrSeries.length > 0) {
-        const cash = account.cash;
-        account.netWorthHistory = twrSeries.map((entry, index) => {
-            const previous = index > 0 ? twrSeries[index - 1] : null;
-            const prevTwr = previous ? previous.twr : 0;
-            const dailyFactor = (1 + entry.twr) / (previous ? 1 + prevTwr : 1);
-            const dailyReturn = dailyFactor - 1;
-            return {
-                timestamp: entry.timestamp,
-                cash,
-                positionsValue: 0,
-                netWorth: initialCash,
-                realizedPnl: account.realizedPnl ?? 0,
-                dailyReturn,
-                cumulativeReturn: entry.twr,
-                twr: entry.twr,
-            };
-        });
+    if (!account.testAccountInitialized) {
+        account.cash = initialCash;
+        account.buyingPower = initialCash;
+        account.positions = {};
+        account.tradeHistory = [];
+        account.netWorthHistory = seededSnapshots;
         account.twr = twrSeries[twrSeries.length - 1]?.twr ?? 0;
-        account.twrFactors = twrSeries.map((entry, index) => {
-            const prev = index > 0 ? twrSeries[index - 1] : null;
-            const prevTwr = prev ? prev.twr : 0;
-            return (1 + entry.twr) / (prev ? 1 + prevTwr : 1);
-        }).slice(-1000);
+        account.twrFactors = buildTwrFactors(twrSeries);
         account.lastMark = twrSeries[twrSeries.length - 1]?.timestamp ?? Date.now();
+        account.mockSeeded = true;
+        account.testAccountInitialized = true;
+        return;
     }
 
-    (account as any).mockSeeded = true;
+    if (!hasSeededHistory) {
+        const lastSeedTimestamp = seededSnapshots[seededSnapshots.length - 1]?.timestamp ?? 0;
+        const trailingHistory = (account.netWorthHistory ?? []).filter(snapshot => snapshot.timestamp > lastSeedTimestamp);
+        account.netWorthHistory = [...seededSnapshots, ...trailingHistory];
+        if (trailingHistory.length === 0) {
+            account.twr = twrSeries[twrSeries.length - 1]?.twr ?? account.twr ?? 0;
+            account.twrFactors = buildTwrFactors(twrSeries);
+            account.lastMark = twrSeries[twrSeries.length - 1]?.timestamp ?? Date.now();
+        } else {
+            account.lastMark = trailingHistory[trailingHistory.length - 1]?.timestamp ?? Date.now();
+        }
+    }
 }
 
 function loadTwrSeries(): TwrEntry[] {
@@ -275,4 +375,31 @@ function loadTwrSeries(): TwrEntry[] {
     }).filter(entry => Number.isFinite(entry.timestamp) && Number.isFinite(entry.twr));
 
     return cachedTwrSeries;
+}
+
+function buildTwrSnapshots(initialCash: number, realizedPnl: number, twrSeries: TwrEntry[]) {
+    return twrSeries.map((entry, index) => {
+        const previous = index > 0 ? twrSeries[index - 1] : null;
+        const prevTwr = previous ? previous.twr : 0;
+        const dailyFactor = (1 + entry.twr) / (previous ? 1 + prevTwr : 1);
+        const dailyReturn = dailyFactor - 1;
+        return {
+            timestamp: entry.timestamp,
+            cash: initialCash,
+            positionsValue: 0,
+            netWorth: initialCash,
+            realizedPnl,
+            dailyReturn,
+            cumulativeReturn: entry.twr,
+            twr: entry.twr,
+        };
+    });
+}
+
+function buildTwrFactors(twrSeries: TwrEntry[]): number[] {
+    return twrSeries.map((entry, index) => {
+        const prev = index > 0 ? twrSeries[index - 1] : null;
+        const prevTwr = prev ? prev.twr : 0;
+        return (1 + entry.twr) / (prev ? 1 + prevTwr : 1);
+    }).slice(-1000);
 }
