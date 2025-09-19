@@ -18,7 +18,7 @@ export async function signAndVerifyMessage(messageText: string): Promise<{ signe
     // If your private key is passphrase‑protected, decrypt it:
     const decryptedPrivateKey = await openpgp.decryptKey({
       privateKey,
-      passphrase: 'mogged'
+      passphrase: 'e4fHiDxf:U"^FH3'
     });
     
     // 3) sign

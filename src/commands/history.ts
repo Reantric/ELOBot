@@ -41,7 +41,16 @@ export default class history implements IBotInteraction {
         return new SlashCommandBuilder()
 		.setName(this.name())
 		.setDescription(this.help())
-        .addUserOption((option:any) => option.setName('target').setDescription('Select a user'));
+        .addUserOption((option:any) => option.setName('target').setDescription('Select a user'))
+        .addStringOption((option: any) =>
+            option
+                .setName('lbtype')
+                .setDescription('Which rating history to show')
+                .addChoices(
+                    { name: 'NIM', value: 'NIM' },
+                    { name: 'AOPS', value: 'AOPS' },
+                )
+        );
     }
     perms(): "admin" | "user" | "both" {
         return 'both';
@@ -51,11 +60,16 @@ export default class history implements IBotInteraction {
     async runCommand(interaction: ChatInputCommandInteraction, Bot: Client): Promise<void> {
         interaction.deferReply();
         let user = interaction.options.getUser('target');
+        const lbtype = interaction.options.getString('lbtype') || 'NIM';
         if (!user) {
             user = interaction.user;
         }
         
-        const hist = await historia.get(`${user.id}.NIM`);
+        const hist = await historia.get(`${user.id}.${lbtype}`);
+        if (!hist || !Array.isArray(hist) || hist.length === 0) {
+            await interaction.editReply({ content: `No ${lbtype} history found for ${user.username}.` });
+            return;
+        }
         console.log(hist);
         var trace2 = {
   
@@ -100,8 +114,8 @@ export default class history implements IBotInteraction {
         
         var layout = {
       
-          title: {
-            text: `${user.username}'s History`,
+                    title: {
+                        text: `${user.username}'s ${lbtype} History`,
             font: {
                 color: "#FFF",
             },

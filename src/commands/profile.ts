@@ -1,10 +1,11 @@
-import { Client, Role, Interaction, CommandInteraction, User, RoleManager, GuildMemberRoleManager, ChatInputCommandInteraction } from "discord.js";
+import { Client, ChatInputCommandInteraction, User } from "discord.js";
 import { EmbedBuilder } from "discord.js";
 import { IBotInteraction } from "../api/capi";
 import { SlashCommandBuilder } from '@discordjs/builders';
 import { QuickDB } from "quick.db";
+import { markToMarket } from '../util/trading/portfolio.js';
+
 const db = new QuickDB();
-import Titles from "../util/Titles.js";
 
 export default class profile implements IBotInteraction {
 
@@ -13,7 +14,7 @@ export default class profile implements IBotInteraction {
     } 
 
     help(): string {
-        return "View your Rating, Rating Deviation, and Title";
+        return "View your net worth and AOPSelo";
     }   
     
     cooldown(): number{
@@ -34,36 +35,30 @@ export default class profile implements IBotInteraction {
     }
 
     private async formatProfileEmbed(user: User) {
-        const valNIM = await db.get(`${user.id}.pointsNIM`);
-        const rdNIM = await db.get(`${user.id}.rdNIM`);
+        const aopsElo = await db.get(`${user.id}.pointsAOPS`);
+        const valuation = await markToMarket(user.id, true);
 
-        const valAOPS = await db.get(`${user.id}.pointsAOPS`);
-        const rdAOPS = await db.get(`${user.id}.rdAOPS`);
-        const embed = new EmbedBuilder();
-        const NimTitle = Titles.getTitle(valNIM);
-        const AOPSTitle = Titles.getTitle(valAOPS);
-        embed.setTitle(`${user.username}'s Profile`)
-        .setDescription(`Here is ${user.username}'s info!`)
-        .setAuthor({name: user.username, iconURL: user.avatarURL()!})
-        .setColor(NimTitle[1]) // (max of both titles?)
-        .addFields({
-            name: 'Nim Rating',
-            value: `**${Math.floor(valNIM)}** ± ${Math.round(rdNIM)}`,
-            inline: true
-        })
-        .addFields({
-            name: 'AOPS Rating',
-            value: `**${Math.floor(valAOPS)}** ± ${Math.round(rdAOPS)}`,
-            inline: true
-        })
-        .addFields({
-            name: 'Title',
-            value: `**${NimTitle[0]}**`,
-            inline: true
-        })
-        .setThumbnail(user.avatarURL()!)
-        .setTimestamp(new Date())
-        .setFooter({text: 'ME Profile'});
+        const embed = new EmbedBuilder()
+            .setTitle(`${user.username}'s Profile`)
+            .setDescription(`Overview for ${user.username}`)
+            .setColor(0x5865f2)
+            .addFields(
+                { name: 'Net Worth', value: `**${valuation ? this.safeCurrency(valuation.netWorth) : 'N/A'}**`, inline: true },
+                { name: 'AOPSelo', value: aopsElo ? `**${Math.floor(aopsElo)}**` : 'N/A', inline: true },
+            )
+            .addFields(
+                { name: 'Time-Weighted Return', value: valuation ? `**${this.safePercentage(valuation.twr)}**` : 'N/A', inline: true },
+            )
+            .setTimestamp(new Date())
+            .setFooter({ text: 'Profile' });
+
+        const avatar = user.avatarURL();
+        if (avatar) {
+            embed.setAuthor({ name: user.username, iconURL: avatar });
+            embed.setThumbnail(avatar);
+        } else {
+            embed.setAuthor({ name: user.username });
+        }
         return embed;
     }
 
@@ -80,5 +75,19 @@ export default class profile implements IBotInteraction {
         });  
 
         
+    }
+
+    private safeCurrency(value?: number) {
+        if (value == null || !Number.isFinite(value)) return 'N/A';
+        return value.toLocaleString('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            maximumFractionDigits: 2,
+        });
+    }
+
+    private safePercentage(value?: number) {
+        if (value == null || !Number.isFinite(value)) return 'N/A';
+        return `${(value * 100).toFixed(2)}%`;
     }
 }

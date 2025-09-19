@@ -1,233 +1,95 @@
-import { CommandInteraction, ActionRowBuilder, ButtonBuilder, EmbedBuilder, ButtonStyle, Interaction, ButtonInteraction } from 'discord.js';
 import { SlashCommandBuilder } from '@discordjs/builders';
+import { ChatInputCommandInteraction, Client, EmbedBuilder } from 'discord.js';
 import { IBotInteraction } from "../api/capi";
-import { QuickDB } from "quick.db";
-import Titles from '../util/Titles.js';
+import { listAccounts } from '../util/trading/dataStore.js';
+import { formatCurrency, formatPercentage } from '../util/trading/view.js';
 
-const db: QuickDB = new QuickDB();
+interface LeaderboardEntry {
+    userId: string;
+    netWorth: number;
+    twr: number;
+    updatedAt: number;
+}
 
 export default class Leaderboard implements IBotInteraction {
-    private readonly aliases = ["leaderboard", "lb"];
-
     name(): string {
-        return "leaderboard";
+        return 'leaderboard';
     }
 
     help(): string {
-        return "Displays a points leaderboard!";
+        return 'Leaderboard ranked by total trading net worth';
     }
 
     cooldown(): number {
-        return 600;
+        return 30;
     }
 
-    isThisInteraction(command: string): boolean {
-        return this.aliases.includes(command);
-    }
-
-    data(): any {
-        return new SlashCommandBuilder()
-            .setName(this.name())
-            .setDescription(this.help());
-    }
-
-    perms(): "admin" | "user" | "both" {
+    perms(): 'admin' | 'user' | 'both' {
         return 'both';
     }
 
-    async runCommand(interaction: CommandInteraction): Promise<void> {
-        // Fetch data from database
-        const leaderboardData = await this.fetchLeaderboardData(interaction.guild!.id, interaction);
+    isThisInteraction(command: string): boolean {
+        return command === this.name();
+    }
 
-        // Create and send the embed with pagination
-        const embed = this.createLeaderboardEmbed(leaderboardData, 0, interaction); // Start at page 0
-        const buttons: any = this.createPaginationButtons(0);
-        await interaction.reply({ embeds: [embed], components: [buttons], ephemeral: false });
+    data(): any {
+        return new SlashCommandBuilder().setName(this.name()).setDescription(this.help());
+    }
 
-        let currentPage = 0;
+    async runCommand(interaction: ChatInputCommandInteraction, _Bot: Client): Promise<void> {
+        await interaction.deferReply({ ephemeral: false });
+        try {
+            const entries = await this.buildLeaderboard(interaction);
+            const embed = this.renderEmbed(interaction, entries);
+            await interaction.editReply({ embeds: [embed] });
+        } catch (error: any) {
+            await interaction.editReply({ content: `❌ Failed to build leaderboard: ${error.message ?? error}` });
+        }
+    }
 
-        const filter = (i: Interaction) => i.isButton() && i.user.id === interaction.user.id;
-
-        const collector = interaction.channel?.createMessageComponentCollector({ filter, time: 60000 }); // 1 minute for interaction
-
-        collector?.on('collect', async (i: ButtonInteraction) => {
-            await i.deferUpdate(); // acknowledge the interaction
-
-            // Extract the direction and page number from the customId
-            const [direction, pageStr] = i.customId.split('_');
-            currentPage = parseInt(pageStr, 10);
-
-            if (direction === 'next') {
-                currentPage++;
-            } else if (direction === 'previous' && currentPage > 0) { // Prevent going to negative pages
-                currentPage--;
-            }
-
-            // Fetch new data for the page (if your data might change in real-time) or slice the existing data
-            // const newLeaderboardData = await this.fetchLeaderboardData(interaction.guild!.id, interaction);
-
-            const newEmbed = this.createLeaderboardEmbed(leaderboardData, currentPage, interaction); // use newLeaderboardData if you fetched fresh data
-            const newButtons: any = this.createPaginationButtons(currentPage);
-
-            await i.editReply({ embeds: [newEmbed], components: [newButtons] });
+    private async buildLeaderboard(interaction: ChatInputCommandInteraction): Promise<LeaderboardEntry[]> {
+        const accounts = await listAccounts();
+        const entries: LeaderboardEntry[] = accounts.map(account => {
+            const latest = account.netWorthHistory.length > 0
+                ? account.netWorthHistory[account.netWorthHistory.length - 1]
+                : undefined;
+            const netWorth = latest?.netWorth ?? account.cash;
+            const updatedAt = latest?.timestamp ?? account.lastMark ?? Date.now();
+            return {
+                userId: account.userId,
+                netWorth,
+                twr: account.twr ?? latest?.twr ?? 0,
+                updatedAt,
+            };
         });
 
-        collector?.on('end', () => {
-
-        });
-
-
+        return entries
+            .filter(entry => Number.isFinite(entry.netWorth))
+            .sort((a, b) => b.netWorth - a.netWorth)
+            .slice(0, 15);
     }
 
-    private createPaginationButtons(currentPage: number): ActionRowBuilder {
-        const buttons = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`previous_${currentPage}`)  // Embedding the current page number
-                    .setLabel('Previous')
-                    .setStyle(ButtonStyle.Primary)
-                    .setDisabled(currentPage === 0),  // Disable if it's the first page
-                new ButtonBuilder()
-                    .setCustomId(`next_${currentPage}`)  // Embedding the current page number
-                    .setLabel('Next')
-                    .setStyle(ButtonStyle.Primary),
-            );
-
-        return buttons;
-    }
-
-    private isNumber(value?: string | number): boolean
-    {
-       return ((value != null) &&
-               (value !== '') &&
-               !isNaN(Number(value.toString())));
-    }
-
-    private createLeaderboardEmbed(userArray: [string, number, number][], page: number, interaction: CommandInteraction): EmbedBuilder {
-        const begint = page * 10;
-        const endt = Math.min(userArray.length - 1, begint + 9);
+    private renderEmbed(interaction: ChatInputCommandInteraction, entries: LeaderboardEntry[]): EmbedBuilder {
         const embed = new EmbedBuilder()
-            .setTitle('ELO Leaderboard')
-            .setColor('Aqua')
-            .setDescription('💀 Here are the top Fuckers who have the highest Ratings!? 💀 ')
-            .setTitle('Points Leaderboard!')
-            .setAuthor({name: interaction.user!.username, iconURL: interaction.user!.avatarURL()!})
-           // .setImage('https://i.redd.it/l28662sbcec51.png')
-            .setTimestamp()
-            .setThumbnail('https://i.imgur.com/aowYZQG.jpeg');
+            .setTitle('Paper Trading Leaderboard')
+            .setColor(0x8e44ad)
+            .setTimestamp(new Date())
+            .setFooter({ text: `Requested by ${interaction.user.username}` });
 
-        for (var i = begint; i <= endt; ++i) {
-            let username: any = userArray[i][0];
-            var title = "";
-            if (this.isNumber(userArray[i][0]))
-                username = interaction.client.users.cache.find(user => user.id === userArray[i][0])?.username;//cannot read property 0 of indefined
-            else
-                title = "**BOT**";
-            let rounded;
-            let stable = "";
-            if (isNaN(userArray[i][1])) {
-                console.log(username, userArray[i]);
-                rounded = NaN;
-                // userArray[i][1] = "N/A";
-            }
-            else
-                rounded = Math.round(userArray[i][1]);
-            
-            let initializer = "";
-
-            if (i == 0)
-                initializer = `<:first_place:822885876144275499>`;
-            else if (i == 1)
-                initializer = `<:second_place:822887005679648778>`;
-            else if (i == 2)
-                initializer = `<:third_place:822887031143137321>`;
-
-
-            var value: any = userArray[i][1];
-            if (userArray[i][2] > 150)
-                stable="?";
-            
-            if (isNaN(value))
-                value = "N/A"
-            else if (stable=="" && title == "")
-                title = Titles.getAbbrev(value);
-            if (userArray[i][0] == interaction.member!.user.id)
-                embed.addFields(
-                    { name: `${initializer} **#${(i + 1)}: ${title} ${username}** (You)`, value: `**${rounded}**${stable}` },)
-            else
-                embed.addFields(
-                    { name: `${initializer} #${(i + 1)}: ${title} ${username}`, value: `${rounded}${stable}` },)
+        if (entries.length === 0) {
+            embed.setDescription('No accounts found yet. Run /buy or /sell to create your account.');
+            return embed;
         }
 
-        let ind = this.search(userArray,interaction.member!.user.id);
-        let initializer = "";
-
-                if(ind==0)
-                        initializer = `<:first_place:822885876144275499>`;
-                else if(ind==1)
-                        initializer = `<:second_place:822887005679648778>`;                
-                else if(ind==2)
-                        initializer = `<:third_place:822887031143137321>`;
-        
-                        
-        
-        var stable = "";
-        var title = "";
-        if (stable=="")
-            title = Titles.getAbbrev(userArray[ind][1]);
-        if (userArray[ind][2] > 150)
-            stable="?";
-        embed.addFields({
-            name: `You → ${initializer} **#${ind+1}: ${title} ${interaction.member!.user.username}**`,
-            value:`**${Number(Math.round(userArray[ind][1]))}**${stable}`
+        const lines = entries.map((entry, index) => {
+            const rank = index + 1;
+            const member = interaction.guild?.members.cache.get(entry.userId)?.displayName
+                ?? interaction.client.users.cache.get(entry.userId)?.username
+                ?? entry.userId;
+            return `**#${rank}** ${member} • Net ${formatCurrency(entry.netWorth)} • TWR ${formatPercentage(entry.twr)}`;
         });
 
+        embed.setDescription(lines.join('\n'));
         return embed;
-
-    }
-    
-    private search(array: any[][], targetValue: any) {
-        // genuinely shitty algorithm, use BS later
-        for (var i = 0; i < array.length; i++){
-            if (array[i][0] == targetValue)
-                return i;
-        }
-        return -1;
-    }
-
-
-    private async fetchLeaderboardData(guildId: string, interaction: CommandInteraction): Promise<[string, number,number][]> {
-        let userArray: [string, number, number][] = [];
-        let guildArray = interaction.guild!.members.cache.map((element: any) => {
-            return element.id
-        })
-
-        for (const o of await db.all()) {
-            if (o.id == process.env.CLIENT_ID)
-                continue;
-            if (this.isNumber(o.id) && (o.value.bot === undefined || !o.value.bot)){ // fix later
-                if (guildArray.includes(o.id)) {
-                    let pts,rd;
-                    if (typeof o.value === 'string'){
-                        pts = JSON.parse(o.value).pointsNIM;
-                        rd = JSON.parse(o.value).rdNIM;
-                    }
-                    else {
-                        pts = o.value.pointsNIM;
-                        rd = o.value.rdNIM;
-                    }
-                    userArray.push([o.id, pts,rd])
-                }
-            } else {
-                console.log("Roger?");
-                userArray.push([o.id,o.value.pointsNIM,o.value.rdNIM]);
-            }
-        }
-        userArray.sort((a: [string, number,number], b: [string, number,number]) => {
-            return b[1] - a[1];
-        });
-
-        return userArray;
-
     }
 }
