@@ -27,6 +27,23 @@ export interface OptionPosition extends PositionBase {
 
 export type Position = EquityPosition | OptionPosition;
 
+export interface PendingOptionOrder {
+    id: string;
+    userId: string;
+    symbol: string;
+    expiration: string;
+    strike: number;
+    right: OptionRight;
+    side: TradeSide;
+    limitPrice: number;
+    quantity: number;
+    multiplier: number;
+    createdAt: number;
+    status: 'OPEN' | 'FILLED';
+    fillPrice?: number;
+    filledAt?: number;
+}
+
 export interface Trade {
     id: string;
     timestamp: number;
@@ -69,6 +86,7 @@ export interface TradingAccount {
     twrFactors: number[];
     settings: AccountSettings;
     lastMark?: number;
+    pendingOrders: PendingOptionOrder[];
 }
 
 export interface PriceQuote {
@@ -79,6 +97,18 @@ export interface PriceQuote {
     previousClose?: number;
     change?: number;
     changePercent?: number;
+    dayHigh?: number;
+    dayLow?: number;
+    dayOpen?: number;
+    fiftyTwoWeekHigh?: number;
+    fiftyTwoWeekLow?: number;
+    preMarketPrice?: number;
+    preMarketChange?: number;
+    preMarketChangePercent?: number;
+    postMarketPrice?: number;
+    postMarketChange?: number;
+    postMarketChangePercent?: number;
+    volume?: number;
 }
 
 export interface OptionContractQuote {

@@ -15,10 +15,27 @@ import Titles from "../util/Titles.js";
 import puppeteer from 'puppeteer';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { markToMarket } from '../util/trading/portfolio.js';
+import { formatPercentage, formatCurrency } from '../util/trading/view.js';
 
 // Define __dirname for ESM modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const TWR_RANGES: { name: string; min: number; max: number; color: string }[] = [
+    { name: 'Easy', min: Number.NEGATIVE_INFINITY, max: -10, color: '#75F347' },
+    { name: 'Medium', min: -10, max: 0, color: '#FFFE00' },
+    { name: 'Hard', min: 0, max: 10, color: '#FD7C00' },
+    { name: 'Difficult', min: 10, max: 25, color: '#FF3232' },
+    { name: 'Challenging', min: 25, max: 40, color: '#A00000' },
+    { name: 'Intense', min: 40, max: 60, color: '#19232D' },
+    { name: 'Remorseless', min: 60, max: 100, color: '#C800C8' },
+    { name: 'Insane', min: 100, max: 150, color: '#0000FF' },
+    { name: 'Extreme', min: 150, max: 300, color: '#0389FF' },
+    { name: 'Terrifying', min: 300, max: 600, color: '#00FFFF' },
+    { name: 'Terrifyting', min: 600, max: 1500, color: '#FF66FF' },
+    { name: 'Catastrophic', min: 1500, max: Number.POSITIVE_INFINITY, color: '#FFFFFF' },
+];
 
 export default class history implements IBotInteraction {
 
@@ -49,6 +66,7 @@ export default class history implements IBotInteraction {
                 .addChoices(
                     { name: 'NIM', value: 'NIM' },
                     { name: 'AOPS', value: 'AOPS' },
+                    { name: 'Market', value: 'MARKET' },
                 )
         );
     }
@@ -58,100 +76,156 @@ export default class history implements IBotInteraction {
 
 
     async runCommand(interaction: ChatInputCommandInteraction, Bot: Client): Promise<void> {
-        interaction.deferReply();
+        await interaction.deferReply();
         let user = interaction.options.getUser('target');
-        const lbtype = interaction.options.getString('lbtype') || 'NIM';
+        const lbtype = (interaction.options.getString('lbtype') || 'NIM') as 'NIM' | 'AOPS' | 'MARKET';
         if (!user) {
             user = interaction.user;
         }
-        
-        const hist = await historia.get(`${user.id}.${lbtype}`);
-        if (!hist || !Array.isArray(hist) || hist.length === 0) {
-            await interaction.editReply({ content: `No ${lbtype} history found for ${user.username}.` });
-            return;
+
+        let hist: number[] = [];
+        let twrDisplay: string | null = null;
+
+        let latestNetWorth: number | null = null;
+        let valuation: Awaited<ReturnType<typeof markToMarket>> | null = null;
+
+        if (lbtype === 'MARKET') {
+            valuation = await markToMarket(user.id, true);
+            const netHistory = valuation.account.netWorthHistory ?? [];
+            if (!netHistory.length) {
+                await interaction.editReply({ content: `No market history found for ${user.username}.` });
+                return;
+            }
+            hist = netHistory.map(point => ((point.cumulativeReturn ?? 0) * 100));
+            twrDisplay = formatPercentage(valuation.twr ?? 0);
+            latestNetWorth = valuation.netWorth;
+        } else {
+            const rawHist = await historia.get(`${user.id}.${lbtype}`);
+            if (!rawHist || !Array.isArray(rawHist) || rawHist.length === 0) {
+                await interaction.editReply({ content: `No ${lbtype} history found for ${user.username}.` });
+                return;
+            }
+            hist = rawHist;
         }
-        console.log(hist);
-        var trace2 = {
-  
-          y: hist,
-        
-          type: "scatter",
-          line: {
-              color: '#FFFFFF', // Choose the color you want for the line.
-              width: 5, // This makes the line thicker, increasing its visibility.
-              opacity: 1
+
+        const isMarket = lbtype === 'MARKET';
+
+        const xValues = (() => {
+            if (isMarket && valuation) {
+                const baseTimestamp = valuation.account.netWorthHistory[0]?.timestamp ?? Date.now();
+                const rawDays = valuation.account.netWorthHistory.map(point => {
+                    const diff = point.timestamp - baseTimestamp;
+                    return Math.round(diff / (1000 * 60 * 60 * 24));
+                });
+                const finalDay = rawDays.length ? rawDays[rawDays.length - 1] : 0;
+                return rawDays.map(day => day - finalDay);
+            }
+            const finalIndex = hist.length ? hist.length - 1 : 0;
+            return hist.map((_, idx) => idx - finalIndex);
+        })();
+
+        const trace2 = {
+            x: xValues,
+            y: hist,
+            type: "scatter",
+            mode: 'lines',
+            line: {
+                color: isMarket ? '#4FD1C5' : '#FFFFFF',
+                width: 5,
+                opacity: 1
             },
             marker: {
-              size: 11, // Adjust the size as needed for visibility.
-              color: 'white', // The color of the marker, can be customized.
-              line: {
-                color: 'white', // Border color for the marker, can be customized.
-                width: 2 // Border width of the marker, can be adjusted.
-              }
-            }
-        
-        
-        };
-  
-        let rank_boundaries = [];
-  
-        for (const x of Titles.Title) {
-          rank_boundaries.push({
-            type: 'rect',
-            xref: 'paper',
-            yref: 'y',
-            x0: 0,
-            x1: 1,
-            y0: x[2][0],  // assuming your y-axis starts at this value
-            y1: x[2][1],  // mid-point
-            fillcolor: x[4],  // or any color you prefer
-            opacity: 0.35,
-            line: {
-              width: 0
-            }
-          });
-        }      
-        
-        var layout = {
-      
-                    title: {
-                        text: `${user.username}'s ${lbtype} History`,
-            font: {
-                color: "#FFF",
+                size: 8,
+                color: isMarket ? '#4FD1C5' : '#FFFFFF',
+                line: {
+                    color: isMarket ? '#4FD1C5' : '#FFFFFF',
+                    width: 2
+                }
             },
-        },
-        
-          xaxis: {
-              tickangle: 0,
-              title: {
-                  text: "Problems Solved",
-              },
-              showgrid: true,
-              zeroline: false,
-              color: "#FFFF00",
-              //tickvals: [0,5,10,15,20],
-              tickfont: {
-                  size: 25
-              },
-              //range: [0,20]
-          },
-          yaxis: {
-              title: {
-                  text: "",
-              },
-              showline: true,
-              color: "#BFFF00",
-              tickformat: ',d',
-              tickfont: {
-                  size: 25
-              },range: [0,Math.max(...hist)+200]
-          },
-          
-        paper_bgcolor: "#000000",
-        plot_bgcolor: "#000000",
-        shapes: rank_boundaries
+            fill: 'tozeroy',
+            fillcolor: isMarket ? 'rgba(79, 209, 197, 0.12)' : 'rgba(255, 255, 255, 0.08)'
         };
-  
+
+        const chartMax = hist.length ? Math.max(...hist, 0) : 0;
+        const chartMin = hist.length ? Math.min(...hist, 0) : 0;
+        const buffer = Math.max(Math.abs(chartMax - chartMin) * 0.1, 5);
+        const yRange = [chartMin - buffer, chartMax + buffer];
+
+        let rank_boundaries: any[] = [];
+        if (isMarket) {
+            rank_boundaries = TWR_RANGES.map(range => {
+                const y0 = range.min === Number.NEGATIVE_INFINITY ? yRange[0] : range.min;
+                const y1 = range.max === Number.POSITIVE_INFINITY ? yRange[1] : range.max;
+                if (y1 < yRange[0] || y0 > yRange[1]) {
+                    return null;
+                }
+                return {
+                    type: 'rect',
+                    xref: 'paper',
+                    yref: 'y',
+                    x0: 0,
+                    x1: 1,
+                    y0,
+                    y1,
+                    fillcolor: range.color,
+                    opacity: 0.20,
+                    line: { width: 0 }
+                };
+            }).filter(Boolean) as any[];
+        } else {
+            rank_boundaries = Titles.Title.map(x => ({
+                type: 'rect',
+                xref: 'paper',
+                yref: 'y',
+                x0: 0,
+                x1: 1,
+                y0: x[2][0],
+                y1: x[2][1],
+                fillcolor: x[4],
+                opacity: 0.35,
+                line: { width: 0 }
+            }));
+        }
+
+        const layout: any = {
+            title: {
+                text: isMarket
+                    ? `${user.username}'s TWR History${twrDisplay ? ` • Current ${twrDisplay}` : ''}`
+                    : `${user.username}'s ${lbtype} History`,
+                font: {
+                    color: "#FFFFFF",
+                },
+            },
+            xaxis: {
+                tickangle: 0,
+                title: {
+                    text: isMarket ? 'Days Relative (end = 0)' : 'Problems Solved',
+                },
+                showgrid: true,
+                zeroline: false,
+                color: "#F0F0F0",
+                tickfont: {
+                    size: 18
+                },
+            },
+            yaxis: {
+                title: {
+                    text: isMarket ? 'TWR (%)' : '',
+                },
+                showline: true,
+                color: "#F0F0F0",
+                tickformat: isMarket ? ',.0f' : ',d',
+                tickfont: {
+                    size: 18
+                },
+                range: isMarket
+                    ? yRange
+                    : [0, Math.max(...hist) + 200]
+            },
+            paper_bgcolor: "#2f3136",
+            plot_bgcolor: "#2f3136",
+            shapes: rank_boundaries
+        };
      // const plotData = [trace2];
   
       try {
@@ -174,7 +248,7 @@ export default class history implements IBotInteraction {
               <title>Plotly Chart</title>
               <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
           </head>
-          <body style="margin:0; padding:0; background-color:#000000;">
+          <body style="margin:0; padding:0; background-color:#2f3136;">
               <div id="plot" style="width:1100px; height:600px;"></div>
               <script>
                   const hist = ${JSON.stringify(hist)};
@@ -203,13 +277,20 @@ export default class history implements IBotInteraction {
         //  let imageBuffer = await plotElement.screenshot({ omitBackground: true });
         //imageBuffer = Buffer.from(await plotElement.screenshot({ omitBackground: true }));
         const imageBuffer = Buffer.from(await plotElement.screenshot({ omitBackground: true }));
-          
+         
         const imageAttachment = new AttachmentBuilder(imageBuffer as any, { name: 'hist.png' });
 
         // Then reply with the attachment
-        await interaction.editReply({
-        files: [imageAttachment],
-        });
+        const payload: any = {
+            files: [imageAttachment],
+        };
+        if (isMarket) {
+            const lastValue = hist.length ? hist[hist.length - 1] : 0;
+            const twrText = twrDisplay ?? formatPercentage(lastValue / 100);
+            const worthText = latestNetWorth != null ? formatCurrency(latestNetWorth) : 'N/A';
+            payload.content = `Net Worth: ${worthText} • TWR: ${twrText}`;
+        }
+        await interaction.editReply(payload);
 
           // Close Puppeteer
           await browser.close();

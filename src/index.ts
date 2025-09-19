@@ -33,8 +33,8 @@ const __dirname = dirname(__filename);
 
 
 config({ path: resolve(__dirname, '../.env') }); // Adjust the relative path according to your project's structure
-console.log('TOKEN:', process.env.TOKEN);
-console.log('CLIENT ID:', process.env.CLIENT_ID);
+// console.log('TOKEN:', process.env.TOKEN);
+// console.log('CLIENT ID:', process.env.CLIENT_ID);
 
 import { QuickDB } from "quick.db";
 import { NimBotStrategyFactory } from './util/NimBSFactory.js';
@@ -63,6 +63,9 @@ let commands: IBotInteraction[] = [];
 let events: IBotEvent[] = [];
 let reacts: IBotReact[] = [];
 const command_cooldowns: any = new Collection();
+const COOLDOWN_EXEMPT_USERS = new Set<string>([
+    '1134353765240160346',
+]);
 
 export function randint(min: number,max: number) {
     return Math.floor(Math.random()*(max-min+1)+min);
@@ -277,9 +280,11 @@ async function handleCommand(interaction: CommandInteraction){
             const now = Date.now();
             const timestamps = command_cooldowns.get(commandClass.name()); //whatever is in the Discord.Collection, yeah thats timestamps now!
             const cooldownAmount = (commandClass.cooldown() || 3) * 1000; //from ms to sec
+            const userId = interaction.member?.user.id ?? interaction.user.id;
+            const bypassCooldown = userId ? COOLDOWN_EXEMPT_USERS.has(userId) : false;
             //Begins the cooldown command process!
-            if (timestamps.has(interaction.member?.user.id)) { //checks to see if user in col
-                const expirationTime: number = timestamps.get(interaction.member?.user.id) + cooldownAmount; //expiration is time assigned to user + cooldownAmt
+            if (!bypassCooldown && timestamps.has(userId)) { //checks to see if user in col
+                const expirationTime: number = timestamps.get(userId) + cooldownAmount; //expiration is time assigned to user + cooldownAmt
             
                 if (now < expirationTime) { // This code is absolutely abysmal, my god a pizza pasta
                     const timeLeft = (expirationTime - now) / 1000;
@@ -292,8 +297,10 @@ async function handleCommand(interaction: CommandInteraction){
                 } //if hours, run 1, if min, run2, else run3
             }
             }
-            timestamps.set(interaction.member?.user.id, now); //user = key, time = val
-            setTimeout(() => timestamps.delete(interaction.member?.user.id), cooldownAmount); //wait cooldownAmt!
+            if (!bypassCooldown) {
+                timestamps.set(userId, now); //user = key, time = val
+                setTimeout(() => timestamps.delete(userId), cooldownAmount); //wait cooldownAmt!
+            }
             await commandClass.runCommand(interaction,Bot); //allows asynchronous operation and multithreading so multiple things can happen at once! also executes the cmd!
         }
         catch(e){

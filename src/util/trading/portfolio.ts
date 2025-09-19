@@ -1,4 +1,5 @@
-import { ensureAccount, saveAccount } from './dataStore.js';
+import { ensureAccount, saveAccount, TEST_ACCOUNT_ID } from './dataStore.js';
+import { processPendingOrders } from './trades.js';
 import { getOptionChain, getQuote, getRiskFreeRate } from './marketData.js';
 import { bsGreeks, bsPrice, impliedVol } from './pricing.js';
 import { timeToExpiry } from './time.js';
@@ -38,7 +39,30 @@ export interface MarkOptions {
 }
 
 export async function markToMarket(userId: string, force = false): Promise<PortfolioValuation> {
-    const account = await ensureAccount(userId);
+    let account = await ensureAccount(userId);
+    const pendingResult = await processPendingOrders(account);
+    account = pendingResult.account;
+
+    if (userId === TEST_ACCOUNT_ID && (account as any).mockSeeded && account.netWorthHistory.length > 0) {
+        const latest = account.netWorthHistory[account.netWorthHistory.length - 1];
+        const positionsValue = latest.positionsValue ?? 0;
+
+        const snapshots: PositionSnapshot[] = [];
+
+        const valuation: PortfolioValuation = {
+            account,
+            cash: latest.cash,
+            positionsValue,
+            unrealizedPnl: 0,
+            netWorth: latest.netWorth,
+            realizedPnl: account.realizedPnl ?? 0,
+            twr: account.twr,
+            snapshots,
+        };
+
+        await saveAccount(account);
+        return valuation;
+    }
 
     const snapshots: PositionSnapshot[] = [];
     const quoteCache = new Map<string, number>();

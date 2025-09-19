@@ -82,6 +82,8 @@ export default class amogML implements IBotEvent {
     async runEvent(msg: Discord.Message, Bot: Discord.Client): Promise<void> {
        if (!msg.channel.isTextBased()) return;
 
+       return; // Temporarily disable the bot's response functionality
+
        let channel = msg.channel as Discord.TextChannel;
       // if (msg.guild!.id != '838203182630305822') return;
       //console.log(msg.content);

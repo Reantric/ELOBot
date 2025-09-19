@@ -69,10 +69,18 @@ export default class Sell implements IBotInteraction {
         await interaction.deferReply({ ephemeral: true });
 
         try {
-            const execution = await this.execute(interaction);
-            if (!execution) return;
-            const embed = buildTradeEmbed(interaction, execution, 'SELL');
-            await interaction.editReply({ embeds: [embed] });
+            const outcome = await this.execute(interaction);
+            if (!outcome) return;
+            if (outcome.kind === 'filled') {
+                const embed = buildTradeEmbed(interaction, outcome.execution, 'SELL');
+                await interaction.editReply({ embeds: [embed] });
+            } else {
+                const order = outcome.order;
+                await interaction.editReply({
+                    content: `🕒 Placed SELL limit order for ${order.symbol} ${order.expiration} ${order.right} ${order.strike} @ ≥ ${order.limitPrice.toFixed(2)}.` +
+                        `\nAwaiting fill (qty ${order.quantity}).`,
+                });
+            }
         } catch (error: any) {
             await interaction.editReply({ content: `❌ Failed to execute trade: ${error.message ?? error}` });
         }

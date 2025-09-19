@@ -31,6 +31,7 @@ export function buildTradeRequest(
             strike,
             right,
             userId,
+            limitOrder: price != null,
         };
         return { request };
     }

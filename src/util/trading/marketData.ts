@@ -60,6 +60,18 @@ export async function getQuote(symbol: string): Promise<PriceQuote> {
         previousClose: raw.regularMarketPreviousClose,
         change: raw.regularMarketChange,
         changePercent: raw.regularMarketChangePercent,
+        dayHigh: raw.regularMarketDayHigh,
+        dayLow: raw.regularMarketDayLow,
+        dayOpen: raw.regularMarketOpen,
+        fiftyTwoWeekHigh: raw.fiftyTwoWeekHigh,
+        fiftyTwoWeekLow: raw.fiftyTwoWeekLow,
+        preMarketPrice: raw.preMarketPrice,
+        preMarketChange: raw.preMarketChange,
+        preMarketChangePercent: raw.preMarketChangePercent,
+        postMarketPrice: raw.postMarketPrice,
+        postMarketChange: raw.postMarketChange,
+        postMarketChangePercent: raw.postMarketChangePercent,
+        volume: raw.regularMarketVolume,
     };
 
     cacheSet(quoteCache, upperSymbol, quote, QUOTE_TTL_MS);

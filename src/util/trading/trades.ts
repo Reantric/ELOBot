@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { ensureAccount, saveAccount, positionKey, upsertPosition, removePosition, appendTrade, createTrade } from './dataStore.js';
 import { getOptionChain, getQuote } from './marketData.js';
 import { markToMarket, PortfolioValuation } from './portfolio.js';
@@ -8,6 +9,7 @@ import {
     Position,
     TradeSide,
     TradingAccount,
+    PendingOptionOrder,
 } from './types.js';
 
 export interface TradeRequestBase {
@@ -27,6 +29,7 @@ export interface OptionTradeRequest extends TradeRequestBase {
     strike: number;
     right: OptionRight;
     multiplier?: number;
+    limitOrder?: boolean;
 }
 
 export type TradeRequest = EquityTradeRequest | OptionTradeRequest;
@@ -46,29 +49,43 @@ export interface TradeExecution {
     valuation: PortfolioValuation;
 }
 
+export type TradeOutcome =
+    | { kind: 'filled'; result: TradeResult }
+    | { kind: 'pending'; order: PendingOptionOrder };
+
+export type TradeResultOrOrder =
+    | { kind: 'filled'; execution: TradeExecution }
+    | { kind: 'pending'; order: PendingOptionOrder };
+
 const FEES_PER_TRADE = 0;
 
-export async function executeBuy(request: TradeRequest): Promise<TradeExecution> {
+export async function executeBuy(request: TradeRequest): Promise<TradeResultOrOrder> {
     const account = await ensureAccount(request.userId);
-    const accountAfter = await handleTrade(account, request, 'BUY');
+    const outcome = await handleTrade(account, request, 'BUY');
+    if (outcome.kind === 'pending') {
+        return outcome;
+    }
     const valuation = await markToMarket(request.userId, true);
-    return { trade: accountAfter, valuation };
+    return { kind: 'filled', execution: { trade: outcome.result, valuation } };
 }
 
-export async function executeSell(request: TradeRequest): Promise<TradeExecution> {
+export async function executeSell(request: TradeRequest): Promise<TradeResultOrOrder> {
     const account = await ensureAccount(request.userId);
-    const accountAfter = await handleTrade(account, request, 'SELL');
+    const outcome = await handleTrade(account, request, 'SELL');
+    if (outcome.kind === 'pending') {
+        return outcome;
+    }
     const valuation = await markToMarket(request.userId, true);
-    return { trade: accountAfter, valuation };
+    return { kind: 'filled', execution: { trade: outcome.result, valuation } };
 }
 
-async function handleTrade(account: TradingAccount, request: TradeRequest, side: TradeSide): Promise<TradeResult> {
+async function handleTrade(account: TradingAccount, request: TradeRequest, side: TradeSide): Promise<TradeOutcome> {
     if (request.quantity <= 0 || !Number.isFinite(request.quantity)) {
         throw new Error('Quantity must be positive');
     }
 
     if (request.assetType === 'EQUITY') {
-        return handleEquityTrade(account, request, side);
+        return { kind: 'filled', result: await handleEquityTrade(account, request, side) };
     }
     return handleOptionTrade(account, request as OptionTradeRequest, side);
 }
@@ -145,7 +162,70 @@ async function handleEquityTrade(account: TradingAccount, request: EquityTradeRe
     };
 }
 
-async function handleOptionTrade(account: TradingAccount, request: OptionTradeRequest, side: TradeSide): Promise<TradeResult> {
+export async function processPendingOrders(account: TradingAccount): Promise<{ account: TradingAccount; filled: PendingOptionOrder[] }> {
+    const pending = account.pendingOrders ?? [];
+    if (!pending.length) {
+        return { account, filled: [] };
+    }
+
+    const remaining: PendingOptionOrder[] = [];
+    const filled: PendingOptionOrder[] = [];
+
+    for (const order of pending) {
+        const chain = await getOptionChain(order.symbol, order.expiration);
+        const bucket = order.right === 'CALL' ? chain.calls : chain.puts;
+        const contract = bucket.find(item => Math.abs(item.strike - order.strike) < 1e-6);
+        if (!contract) {
+            remaining.push(order);
+            continue;
+        }
+
+        const bid = contract.bid ?? contract.midpoint ?? contract.lastPrice;
+        const ask = contract.ask ?? contract.midpoint ?? contract.lastPrice;
+        const fillPrice = order.side === 'BUY' ? ask : bid;
+        const fillable = order.side === 'BUY'
+            ? (fillPrice != null && Number.isFinite(fillPrice) && fillPrice <= order.limitPrice)
+            : (fillPrice != null && Number.isFinite(fillPrice) && fillPrice >= order.limitPrice);
+
+        if (!fillable || fillPrice == null) {
+            remaining.push(order);
+            continue;
+        }
+
+        const fillRequest: OptionTradeRequest = {
+            userId: order.userId,
+            assetType: 'OPTION',
+            symbol: order.symbol,
+            quantity: order.quantity,
+            price: fillPrice,
+            expiration: order.expiration,
+            strike: order.strike,
+            right: order.right,
+            multiplier: order.multiplier,
+            limitOrder: false,
+        };
+
+        const outcome = await handleOptionTrade(account, fillRequest, order.side);
+        if (outcome.kind === 'filled') {
+            order.status = 'FILLED';
+            order.filledAt = Date.now();
+            order.fillPrice = fillPrice;
+            filled.push(order);
+            account = outcome.result.account;
+        } else {
+            remaining.push(order);
+        }
+    }
+
+    account.pendingOrders = remaining;
+    if (filled.length) {
+        await saveAccount(account);
+    }
+
+    return { account, filled };
+}
+
+async function handleOptionTrade(account: TradingAccount, request: OptionTradeRequest, side: TradeSide): Promise<TradeOutcome> {
     const symbol = request.symbol.toUpperCase();
     const chain = await getOptionChain(symbol, request.expiration);
     const bucket = request.right === 'CALL' ? chain.calls : chain.puts;
@@ -155,10 +235,46 @@ async function handleOptionTrade(account: TradingAccount, request: OptionTradeRe
     }
 
     const multiplier = request.multiplier ?? account.settings.optionMultiplier;
-    const price = request.price ?? contract.midpoint ?? contract.lastPrice ?? contract.bid ?? contract.ask;
+    const bid = contract.bid ?? contract.midpoint ?? contract.lastPrice;
+    const ask = contract.ask ?? contract.midpoint ?? contract.lastPrice;
+    const limitOrder = request.limitOrder === true && request.price != null;
+    let price = request.price ?? (side === 'BUY' ? ask : bid);
+
+    if (limitOrder) {
+        const limit = request.price!;
+        const fillPrice = side === 'BUY' ? ask : bid;
+        const fillable = side === 'BUY'
+            ? (fillPrice != null && Number.isFinite(fillPrice) && fillPrice <= limit)
+            : (fillPrice != null && Number.isFinite(fillPrice) && fillPrice >= limit);
+
+        if (!fillable) {
+            const pendingOrder: PendingOptionOrder = {
+                id: randomUUID(),
+                userId: account.userId,
+                symbol,
+                expiration: request.expiration,
+                strike: request.strike,
+                right: request.right,
+                side,
+                limitPrice: limit,
+                quantity: Math.floor(request.quantity),
+                multiplier,
+                createdAt: Date.now(),
+                status: 'OPEN',
+            };
+            account.pendingOrders = account.pendingOrders ?? [];
+            account.pendingOrders.push(pendingOrder);
+            await saveAccount(account);
+            return { kind: 'pending', order: pendingOrder };
+        }
+
+        price = fillPrice;
+    }
+
     if (!price || !Number.isFinite(price)) {
         throw new Error('Cannot determine option price');
     }
+
     const quantity = Math.floor(request.quantity);
     const notional = price * multiplier * quantity;
 
@@ -224,12 +340,15 @@ async function handleOptionTrade(account: TradingAccount, request: OptionTradeRe
     await saveAccount(account);
 
     return {
-        account,
-        position: account.positions[key],
-        executedPrice: price,
-        cost: notional,
-        filledQuantity: quantity,
-        symbol,
-        assetType: 'OPTION',
+        kind: 'filled',
+        result: {
+            account,
+            position: account.positions[key],
+            executedPrice: price,
+            cost: notional,
+            filledQuantity: quantity,
+            symbol,
+            assetType: 'OPTION',
+        },
     };
 }

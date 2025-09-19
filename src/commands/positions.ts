@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from '@discordjs/builders';
-import { ChatInputCommandInteraction, Client, EmbedBuilder } from 'discord.js';
+import { ChatInputCommandInteraction, Client, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, Interaction } from 'discord.js';
 import { IBotInteraction } from '../api/capi';
 import { markToMarket } from '../util/trading/portfolio.js';
 import { formatCurrency, formatNumber, formatPercentage } from '../util/trading/view.js';
@@ -66,7 +66,32 @@ export default class Positions implements IBotInteraction {
                 }
             }
 
-            await interaction.editReply({ embeds: [embed] });
+            const pending = valuation.account.pendingOrders ?? [];
+            const components = pending.length > 0
+                ? [new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`positions_pending_${interaction.id}`)
+                        .setLabel('View Pending Orders')
+                        .setStyle(ButtonStyle.Secondary)
+                )]
+                : [];
+
+            await interaction.editReply({ embeds: [embed], components });
+
+            if (pending.length > 0) {
+                const filter = (i: Interaction) => i.isButton() && i.customId === `positions_pending_${interaction.id}` && i.user.id === interaction.user.id;
+                const collector = interaction.channel?.createMessageComponentCollector({ filter, time: 60_000, max: 1 });
+                collector?.on('collect', async button => {
+                    const list = pending.map(order => {
+                        const ts = new Date(order.createdAt).toLocaleString('en-US', { hour12: false });
+                        return `${order.side} ${order.symbol} ${order.expiration} ${order.right} ${order.strike} • Qty ${order.quantity} @ ${formatCurrency(order.limitPrice)} • Placed ${ts}`;
+                    }).join('\n');
+                    await button.reply({ ephemeral: true, content: list || 'No pending orders.' });
+                });
+                collector?.on('end', () => {
+                    interaction.editReply({ components: [] }).catch(() => undefined);
+                });
+            }
         } catch (error: any) {
             await interaction.editReply({ content: `❌ Failed to load positions: ${error.message ?? error}` });
         }

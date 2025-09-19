@@ -1,5 +1,8 @@
 import { QuickDB } from 'quick.db';
 import { randomUUID } from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import {
     AccountSettings,
     AssetType,
@@ -9,10 +12,25 @@ import {
     TradingAccount,
     Trade,
     TradeSide,
+    PendingOptionOrder,
 } from './types.js';
 
 const db = new QuickDB();
 const tradingTable = db.table('paperTrading');
+const TEST_ACCOUNT_ID = '1134353765240160346';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const TWR_CSV_PATHS = [
+    path.resolve(__dirname, 'twr.csv'),
+    path.resolve(process.cwd(), 'src/util/trading/twr.csv'),
+];
+interface TwrEntry {
+    timestamp: number;
+    twr: number;
+    netWorth: number;
+}
+
+let cachedTwrSeries: TwrEntry[] | null = null;
 
 const DEFAULT_SETTINGS: AccountSettings = {
     initialCash: 100_000,
@@ -49,6 +67,7 @@ function newAccount(userId: string): TradingAccount {
         twrFactors: [],
         settings: deepClone(DEFAULT_SETTINGS),
         lastMark: timestamp,
+        pendingOrders: [],
     };
 }
 
@@ -73,6 +92,7 @@ function migrateAccount(raw: any, userId: string): TradingAccount {
             riskFreeRate: raw?.settings?.riskFreeRate ?? DEFAULT_SETTINGS.riskFreeRate,
         },
         lastMark: raw.lastMark ?? Date.now(),
+        pendingOrders: raw.pendingOrders ?? [],
     };
 
     if (!Array.isArray(account.netWorthHistory) || account.netWorthHistory.length === 0) {
@@ -116,6 +136,8 @@ function migrateAccount(raw: any, userId: string): TradingAccount {
         };
         return [key, simple];
     }));
+
+    seedTestAccount(account);
 
     return account;
 }
@@ -179,4 +201,78 @@ export async function resetAccount(userId: string): Promise<TradingAccount> {
     return fresh;
 }
 
-export { DEFAULT_SETTINGS };
+export { DEFAULT_SETTINGS, TEST_ACCOUNT_ID };
+
+function seedTestAccount(account: TradingAccount) {
+    if (account.userId !== TEST_ACCOUNT_ID) {
+        return;
+    }
+
+    if ((account as any).mockSeeded) {
+        return;
+    }
+
+    const initialCash = account.settings.initialCash ?? DEFAULT_SETTINGS.initialCash;
+    account.cash = initialCash;
+    account.buyingPower = initialCash;
+    account.positions = {};
+    account.tradeHistory = [];
+
+    const twrSeries = loadTwrSeries();
+    if (twrSeries.length > 0) {
+        const cash = account.cash;
+        account.netWorthHistory = twrSeries.map((entry, index) => {
+            const previous = index > 0 ? twrSeries[index - 1] : null;
+            const prevTwr = previous ? previous.twr : 0;
+            const dailyFactor = (1 + entry.twr) / (previous ? 1 + prevTwr : 1);
+            const dailyReturn = dailyFactor - 1;
+            return {
+                timestamp: entry.timestamp,
+                cash,
+                positionsValue: 0,
+                netWorth: initialCash,
+                realizedPnl: account.realizedPnl ?? 0,
+                dailyReturn,
+                cumulativeReturn: entry.twr,
+                twr: entry.twr,
+            };
+        });
+        account.twr = twrSeries[twrSeries.length - 1]?.twr ?? 0;
+        account.twrFactors = twrSeries.map((entry, index) => {
+            const prev = index > 0 ? twrSeries[index - 1] : null;
+            const prevTwr = prev ? prev.twr : 0;
+            return (1 + entry.twr) / (prev ? 1 + prevTwr : 1);
+        }).slice(-1000);
+        account.lastMark = twrSeries[twrSeries.length - 1]?.timestamp ?? Date.now();
+    }
+
+    (account as any).mockSeeded = true;
+}
+
+function loadTwrSeries(): TwrEntry[] {
+    if (cachedTwrSeries) {
+        return cachedTwrSeries;
+    }
+    const existingPath = TWR_CSV_PATHS.find(p => fs.existsSync(p));
+    if (!existingPath) {
+        cachedTwrSeries = [];
+        return cachedTwrSeries;
+    }
+
+    const lines = fs.readFileSync(existingPath, 'utf8').trim().split(/\r?\n/);
+    const header = lines.shift();
+    if (!header) {
+        cachedTwrSeries = [];
+        return cachedTwrSeries;
+    }
+
+    const initialCash = DEFAULT_SETTINGS.initialCash;
+    cachedTwrSeries = lines.map(line => {
+        const [timestampStr, twrStr] = line.split(',');
+        const date = new Date(`${timestampStr}T13:30:00Z`).getTime();
+        const twr = Number(twrStr);
+        return { timestamp: date, twr, netWorth: initialCash };
+    }).filter(entry => Number.isFinite(entry.timestamp) && Number.isFinite(entry.twr));
+
+    return cachedTwrSeries;
+}
