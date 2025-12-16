@@ -69,7 +69,7 @@ export default class Sell implements IBotInteraction {
 
     async runCommand(interaction: ChatInputCommandInteraction, _Bot: Client): Promise<void> {
         const subcommand = interaction.options.getSubcommand();
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply();
 
         if (subcommand === 'stock') {
             await this.handleStock(interaction);

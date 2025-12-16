@@ -30,7 +30,7 @@ export default class PnL implements IBotInteraction {
     }
 
     async runCommand(interaction: ChatInputCommandInteraction, _Bot: Client): Promise<void> {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply();
         try {
             const valuation = await markToMarket(interaction.user.id, true);
             const { account } = valuation;

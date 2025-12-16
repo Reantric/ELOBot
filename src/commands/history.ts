@@ -113,15 +113,13 @@ export default class history implements IBotInteraction {
         const xValues = (() => {
             if (isMarket && valuation) {
                 const baseTimestamp = valuation.account.netWorthHistory[0]?.timestamp ?? Date.now();
-                const rawDays = valuation.account.netWorthHistory.map(point => {
+                return valuation.account.netWorthHistory.map(point => {
                     const diff = point.timestamp - baseTimestamp;
-                    return Math.round(diff / (1000 * 60 * 60 * 24));
+                    const days = Math.round(diff / (1000 * 60 * 60 * 24));
+                    return Math.max(0, days);
                 });
-                const finalDay = rawDays.length ? rawDays[rawDays.length - 1] : 0;
-                return rawDays.map(day => day - finalDay);
             }
-            const finalIndex = hist.length ? hist.length - 1 : 0;
-            return hist.map((_, idx) => idx - finalIndex);
+            return hist.map((_, idx) => idx);
         })();
 
         const trace2 = {
@@ -199,7 +197,7 @@ export default class history implements IBotInteraction {
             xaxis: {
                 tickangle: 0,
                 title: {
-                    text: isMarket ? 'Days Relative (end = 0)' : 'Problems Solved',
+                    text: isMarket ? 'Days Since Start' : 'Problems Solved',
                 },
                 showgrid: true,
                 zeroline: false,

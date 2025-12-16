@@ -27,16 +27,24 @@ export default class Positions implements IBotInteraction {
     }
 
     data(): any {
-        return new SlashCommandBuilder().setName(this.name()).setDescription(this.help());
+        return new SlashCommandBuilder()
+            .setName(this.name())
+            .setDescription(this.help())
+            .addUserOption(option => option
+                .setName('user')
+                .setDescription('User to view positions for')
+                .setRequired(false));
     }
 
     async runCommand(interaction: ChatInputCommandInteraction, _Bot: Client): Promise<void> {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply();
 
         try {
-            const valuation = await markToMarket(interaction.user.id, true);
+            const targetUser = interaction.options.getUser('user') ?? interaction.user;
+            const valuation = await markToMarket(targetUser.id, true);
+            const ownerName = `${targetUser.username}`;
             const embed = new EmbedBuilder()
-                .setTitle(`${interaction.user.username}'s Positions`)
+                .setTitle(`${ownerName}'s Positions`)
                 .setColor(0x1abc9c)
                 .addFields(
                     { name: 'Cash', value: formatCurrency(valuation.cash), inline: true },
@@ -94,7 +102,7 @@ export default class Positions implements IBotInteraction {
                 await button.deferUpdate();
                 if (button.customId === `positions_pending_${interaction.id}`) {
                     currentComponents = [makeRow(true, false)];
-                    const pendingEmbed = this.buildPendingEmbed(interaction, pending);
+                    const pendingEmbed = this.buildPendingEmbed(ownerName, pending);
                     await interaction.editReply({ embeds: [pendingEmbed], components: currentComponents });
                     return;
                 }
@@ -111,9 +119,9 @@ export default class Positions implements IBotInteraction {
         }
     }
 
-    private buildPendingEmbed(interaction: ChatInputCommandInteraction, pending: PendingOrder[]): EmbedBuilder {
+    private buildPendingEmbed(ownerName: string, pending: PendingOrder[]): EmbedBuilder {
         const embed = new EmbedBuilder()
-            .setTitle(`${interaction.user.username}'s Pending Orders`)
+            .setTitle(`${ownerName}'s Pending Orders`)
             .setColor(0xf1c40f);
 
         if (pending.length === 0) {

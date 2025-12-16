@@ -43,7 +43,7 @@ export default class Cancel implements IBotInteraction {
     }
 
     async runCommand(interaction: ChatInputCommandInteraction, _Bot: Client): Promise<void> {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply();
 
         const account = await ensureAccount(interaction.user.id);
         const openOrders = (account.pendingOrders ?? []).filter(order => order.status === 'OPEN');

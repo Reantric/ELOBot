@@ -202,7 +202,7 @@ async function handleButtonPress(interaction: ButtonInteraction){
 }
 
 Bot.on("messageCreate", msg => {
-    console.log("BOt has token [EVENTHANDLEPRE]: " + msg.client.token);
+   // console.log("BOt has token [EVENTHANDLEPRE]: " + msg.client.token);
    // Bot.login(process.env.TOKEN) 
 
    if (msg.content.toLowerCase() === '!hi') {

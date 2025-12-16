@@ -65,7 +65,7 @@ export default class Quote implements IBotInteraction {
         const symbol = interaction.options.getString('symbol', true).toUpperCase();
         const detailed = interaction.options.getBoolean('detailed') ?? false;
         try {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply();
             const baseEmbed = await this.equityQuote(symbol);
 
             if (!detailed) {
@@ -134,7 +134,7 @@ export default class Quote implements IBotInteraction {
             if (interaction.deferred || interaction.replied) {
                 await interaction.editReply({ content: `❌ Failed to fetch quote: ${message}`, embeds: [], components: [] });
             } else {
-                await interaction.reply({ content: `❌ Failed to fetch quote: ${message}`, ephemeral: true });
+                await interaction.reply({ content: `❌ Failed to fetch quote: ${message}` });
             }
         }
     }

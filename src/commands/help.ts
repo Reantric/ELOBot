@@ -47,20 +47,42 @@ export default class help implements IBotInteraction {
         } else {
 
 
-        let embed = new EmbedBuilder();
-        let isTeacher = (interaction.member!.roles as GuildMemberRoleManager).cache.some((role: { name: string; }) => role.name === 'napoleon' || role.name === 'God');
+        const embed = new EmbedBuilder();
+        const isTeacher = (interaction.member!.roles as GuildMemberRoleManager).cache.some((role: { name: string; }) => role.name === 'napoleon' || role.name === 'God');
+        const description = `Here are a list of our ${isTeacher ? 'admin' : 'user'} commands.`;
         embed.setTitle('Linty Command List')
-        .setDescription(`Here are a list of our ${isTeacher ? 'admin' : 'user'} commands.`)
-        .setColor('Blurple');
+            .setDescription(description)
+            .setColor('Blurple');
+
+        const accessibleCommands: { name: string; value: string }[] = [];
         helpUtil.get().forEach((helpPerm: string[], name: string) => {
             if ((helpPerm[1] != 'user' && isTeacher) || (helpPerm[1] != 'admin' && !isTeacher)) {
-                embed.addFields({
-                    name: '/' + name, 
-                    value: helpPerm[0]
+                accessibleCommands.push({
+                    name: '/' + name,
+                    value: helpPerm[0],
                 });
             }
-        })
-        await interaction.reply({embeds: [embed], ephemeral: true});  
+        });
+
+        const embeds: EmbedBuilder[] = [];
+        const chunkSize = 25;
+        for (let i = 0; i < accessibleCommands.length; i += chunkSize) {
+            const chunk = accessibleCommands.slice(i, i + chunkSize);
+            const embedPart = i === 0
+                ? embed
+                : new EmbedBuilder()
+                    .setTitle('Linty Command List (cont.)')
+                    .setColor('Blurple');
+            embedPart.addFields(chunk);
+            embeds.push(embedPart);
+        }
+
+        if (embeds.length === 0) {
+            embed.setDescription(`${description}\n\nNo commands are available to you right now.`);
+            embeds.push(embed);
+        }
+
+        await interaction.reply({ embeds, ephemeral: true });  
     }   
 }
 }

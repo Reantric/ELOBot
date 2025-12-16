@@ -94,6 +94,8 @@ export default class profile implements IBotInteraction {
 
         if (!detailed) {
             embed.addFields({ name: 'Time-Weighted Return', value: this.formatSignedPercentage(valuation.twr), inline: true });
+            embed.addFields({ name: 'Title', value: `**${nimTitle[0]}**`, inline: true });
+
             return embed;
         }
 

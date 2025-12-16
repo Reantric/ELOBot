@@ -48,7 +48,7 @@ export default class Chain implements IBotInteraction {
     }
 
     async runCommand(interaction: ChatInputCommandInteraction, _Bot: Client): Promise<void> {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply();
 
         try {
             const symbol = interaction.options.getString('symbol', true).toUpperCase();

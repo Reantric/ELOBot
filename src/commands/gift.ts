@@ -88,11 +88,11 @@ export default class Gift implements IBotInteraction {
         const target = interaction.options.getUser('target', true);
 
         if (target.bot) {
-            await interaction.reply({ content: '🤖 You cannot gift assets to bots.', ephemeral: true });
+            await interaction.reply({ content: '🤖 You cannot gift assets to bots.' });
             return;
         }
 
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply();
 
         try {
         await ensureAccount(interaction.user.id);

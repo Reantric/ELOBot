@@ -1,4 +1,4 @@
-import { ensureAccount, saveAccount, TEST_ACCOUNT_ID, removePosition } from './dataStore.js';
+import { ensureAccount, saveAccount, removePosition } from './dataStore.js';
 import { processPendingOrders } from './trades.js';
 import { getOptionChain, getQuote, getRiskFreeRate } from './marketData.js';
 import { bsGreeks, bsPrice, impliedVol } from './pricing.js';
@@ -46,35 +46,14 @@ export async function markToMarket(userId: string, force = false): Promise<Portf
     const quoteCache = new Map<string, number>();
     await settleExpiredOptions(account, quoteCache);
 
-    if (userId === TEST_ACCOUNT_ID && account.mockSeeded && account.netWorthHistory.length > 0) {
-        const latest = account.netWorthHistory[account.netWorthHistory.length - 1];
-        const positionsValue = latest.positionsValue ?? 0;
-
-        const snapshots: PositionSnapshot[] = [];
-
-        const valuation: PortfolioValuation = {
-            account,
-            cash: latest.cash,
-            positionsValue,
-            unrealizedPnl: 0,
-            netWorth: latest.netWorth,
-            realizedPnl: account.realizedPnl ?? 0,
-            twr: account.twr,
-            snapshots,
-        };
-
-        await saveAccount(account);
-        return valuation;
-    }
-
-    const snapshots: PositionSnapshot[] = [];
+    let snapshots: PositionSnapshot[] = [];
     let positionsValue = 0;
     let unrealized = 0;
 
     const riskFree = await getRiskFreeRate();
 
     for (const position of Object.values(account.positions)) {
-        if (!position || position.quantity <= 0) {
+        if (!position || position.quantity === 0) {
             continue;
         }
 
@@ -92,10 +71,23 @@ export async function markToMarket(userId: string, force = false): Promise<Portf
         unrealized += optionSnapshot.unrealizedPnl;
     }
 
-    const netWorth = account.cash + positionsValue;
+    let netWorth = account.cash + positionsValue;
+    let marginCallTriggered = false;
+
+    if (netWorth < 0 && snapshots.length > 0) {
+        await performMarginCall(account, snapshots);
+        marginCallTriggered = true;
+        positionsValue = 0;
+        unrealized = 0;
+        snapshots = [];
+        netWorth = account.cash;
+    }
     account.lastMark = Date.now();
 
     await recordNetWorth(account, positionsValue, netWorth);
+    if (marginCallTriggered) {
+        console.log(`Margin call executed for user=${account.userId}; account liquidated to cash=${account.cash.toFixed(2)} realizedPnL=${account.realizedPnl.toFixed(2)}`);
+    }
     await saveAccount(account);
 
     return buildValuation(account, snapshots, positionsValue, unrealized, netWorth);
@@ -245,7 +237,7 @@ async function settleExpiredOptions(account: TradingAccount, quoteCache: Map<str
             continue;
         }
         const expiryDate = startOfDayUtc(toDate(position.expiration));
-        if (expiryDate > today) {
+        if (expiryDate.getTime() >= today.getTime()) {
             continue;
         }
 
@@ -265,16 +257,68 @@ async function settleExpiredOptions(account: TradingAccount, quoteCache: Map<str
         const contracts = position.quantity;
         const payoff = intrinsic * multiplier * contracts;
         const costBasis = position.avgCost * multiplier * contracts;
+        const realized = payoff - costBasis;
 
         account.cash += payoff;
         account.buyingPower = account.cash;
-        account.realizedPnl += payoff - costBasis;
+        account.realizedPnl += realized;
         removePosition(account, 'OPTION', position.symbol, position.contractSymbol);
         mutated = true;
+
+        console.log(`Option expiry settlement: user=${account.userId} contract=${position.contractSymbol} qty=${contracts} payoff=${payoff.toFixed(2)} cost=${costBasis.toFixed(2)} realized=${realized.toFixed(2)}`);
     }
 
     if (mutated) {
         // ensure no stale references remain
         account.positions = { ...account.positions };
+    }
+}
+
+async function performMarginCall(account: TradingAccount, snapshots: PositionSnapshot[]): Promise<void> {
+    for (const snapshot of snapshots) {
+        const position = snapshot.position;
+        if (position.assetType === 'EQUITY') {
+            if (position.quantity > 0) {
+                const proceeds = snapshot.marketPrice * position.quantity;
+                account.cash += proceeds;
+                account.buyingPower = account.cash;
+                const realized = (snapshot.marketPrice - position.avgCost) * position.quantity;
+                account.realizedPnl += realized;
+            } else {
+                const coverQty = Math.abs(position.quantity);
+                const cost = snapshot.marketPrice * coverQty;
+                account.cash -= cost;
+                account.buyingPower = account.cash;
+                const realized = (position.avgCost - snapshot.marketPrice) * coverQty;
+                account.realizedPnl += realized;
+            }
+            removePosition(account, 'EQUITY', position.symbol);
+            continue;
+        }
+
+        const option = position as OptionPosition;
+        const multiplier = option.multiplier ?? account.settings.optionMultiplier;
+        const quantity = option.quantity;
+        const contractValue = snapshot.marketPrice * multiplier * Math.abs(quantity);
+
+        if (quantity > 0) {
+            account.cash += contractValue;
+            account.buyingPower = account.cash;
+            const realized = (snapshot.marketPrice - option.avgCost) * multiplier * quantity;
+            account.realizedPnl += realized;
+        } else {
+            account.cash -= contractValue;
+            account.buyingPower = account.cash;
+            const realized = (option.avgCost - snapshot.marketPrice) * multiplier * Math.abs(quantity);
+            account.realizedPnl += realized;
+        }
+        removePosition(account, 'OPTION', option.symbol, option.contractSymbol);
+    }
+
+    if (account.cash < 0) {
+        // Record the deficit as an additional realized loss so cash can reset to zero
+        account.realizedPnl += account.cash;
+        account.cash = 0;
+        account.buyingPower = 0;
     }
 }

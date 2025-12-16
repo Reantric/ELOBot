@@ -1,8 +1,5 @@
 import { QuickDB } from 'quick.db';
 import { randomUUID } from 'crypto';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import {
     AccountSettings,
     AssetType,
@@ -19,20 +16,6 @@ import {
 
 const db = new QuickDB();
 const tradingTable = db.table('paperTrading');
-const TEST_ACCOUNT_ID = '1134353765240160346';
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const TWR_CSV_PATHS = [
-    path.resolve(__dirname, 'twr.csv'),
-    path.resolve(process.cwd(), 'src/util/trading/twr.csv'),
-];
-interface TwrEntry {
-    timestamp: number;
-    twr: number;
-    netWorth: number;
-}
-
-let cachedTwrSeries: TwrEntry[] | null = null;
 
 const DEFAULT_SETTINGS: AccountSettings = {
     initialCash: 100_000,
@@ -149,7 +132,7 @@ function migrateAccount(raw: any, userId: string): TradingAccount {
         return [key, simple];
     }));
 
-    seedTestAccount(account);
+    ensureLiveTradingState(account);
 
     return account;
 }
@@ -200,31 +183,27 @@ export function removePosition(account: TradingAccount, assetType: AssetType, sy
 }
 
 export function ensureLiveTradingState(account: TradingAccount): boolean {
-    if (!account.mockSeeded) {
+    if (!account.mockSeeded && !account.testAccountInitialized) {
         return false;
     }
 
+    const timestamp = Date.now();
+    const cash = typeof account.cash === 'number' ? account.cash : DEFAULT_SETTINGS.initialCash;
+    account.netWorthHistory = [{
+        timestamp,
+        cash,
+        positionsValue: 0,
+        netWorth: cash,
+        realizedPnl: account.realizedPnl ?? 0,
+        dailyReturn: 0,
+        cumulativeReturn: 0,
+        twr: 0,
+    }];
+    account.twr = 0;
+    account.twrFactors = [];
+    account.lastMark = timestamp;
     account.mockSeeded = false;
-    if (!Array.isArray(account.netWorthHistory) || account.netWorthHistory.length === 0) {
-        const timestamp = Date.now();
-        const baselineCash = account.cash;
-        account.netWorthHistory = [{
-            timestamp,
-            cash: baselineCash,
-            positionsValue: 0,
-            netWorth: baselineCash,
-            realizedPnl: account.realizedPnl ?? 0,
-            dailyReturn: 0,
-            cumulativeReturn: 0,
-            twr: 0,
-        }];
-        account.twr = 0;
-        account.twrFactors = [];
-        account.lastMark = timestamp;
-    } else {
-        const last = account.netWorthHistory[account.netWorthHistory.length - 1];
-        account.lastMark = last.timestamp ?? Date.now();
-    }
+    account.testAccountInitialized = false;
     return true;
 }
 
@@ -242,7 +221,7 @@ export async function resetAccount(userId: string): Promise<TradingAccount> {
     return fresh;
 }
 
-export { DEFAULT_SETTINGS, TEST_ACCOUNT_ID };
+export { DEFAULT_SETTINGS };
 
 function normalizePendingOrder(order: any): PendingOrder | null {
     if (!order) {
@@ -303,103 +282,4 @@ function normalizePendingOrder(order: any): PendingOrder | null {
         assetType: 'EQUITY',
     };
     return normalized;
-}
-
-function seedTestAccount(account: TradingAccount) {
-    if (account.userId !== TEST_ACCOUNT_ID) {
-        return;
-    }
-
-    const twrSeries = loadTwrSeries();
-    if (twrSeries.length === 0) {
-        return;
-    }
-
-    const initialCash = account.settings.initialCash ?? DEFAULT_SETTINGS.initialCash;
-    const seededSnapshots = buildTwrSnapshots(initialCash, account.realizedPnl ?? 0, twrSeries);
-    const hasSeededHistory = Array.isArray(account.netWorthHistory)
-        && account.netWorthHistory.length >= seededSnapshots.length
-        && seededSnapshots.every((snapshot, index) => account.netWorthHistory?.[index]?.timestamp === snapshot.timestamp);
-
-    if (!account.testAccountInitialized) {
-        account.cash = initialCash;
-        account.buyingPower = initialCash;
-        account.positions = {};
-        account.tradeHistory = [];
-        account.netWorthHistory = seededSnapshots;
-        account.twr = twrSeries[twrSeries.length - 1]?.twr ?? 0;
-        account.twrFactors = buildTwrFactors(twrSeries);
-        account.lastMark = twrSeries[twrSeries.length - 1]?.timestamp ?? Date.now();
-        account.mockSeeded = true;
-        account.testAccountInitialized = true;
-        return;
-    }
-
-    if (!hasSeededHistory) {
-        const lastSeedTimestamp = seededSnapshots[seededSnapshots.length - 1]?.timestamp ?? 0;
-        const trailingHistory = (account.netWorthHistory ?? []).filter(snapshot => snapshot.timestamp > lastSeedTimestamp);
-        account.netWorthHistory = [...seededSnapshots, ...trailingHistory];
-        if (trailingHistory.length === 0) {
-            account.twr = twrSeries[twrSeries.length - 1]?.twr ?? account.twr ?? 0;
-            account.twrFactors = buildTwrFactors(twrSeries);
-            account.lastMark = twrSeries[twrSeries.length - 1]?.timestamp ?? Date.now();
-        } else {
-            account.lastMark = trailingHistory[trailingHistory.length - 1]?.timestamp ?? Date.now();
-        }
-    }
-}
-
-function loadTwrSeries(): TwrEntry[] {
-    if (cachedTwrSeries) {
-        return cachedTwrSeries;
-    }
-    const existingPath = TWR_CSV_PATHS.find(p => fs.existsSync(p));
-    if (!existingPath) {
-        cachedTwrSeries = [];
-        return cachedTwrSeries;
-    }
-
-    const lines = fs.readFileSync(existingPath, 'utf8').trim().split(/\r?\n/);
-    const header = lines.shift();
-    if (!header) {
-        cachedTwrSeries = [];
-        return cachedTwrSeries;
-    }
-
-    const initialCash = DEFAULT_SETTINGS.initialCash;
-    cachedTwrSeries = lines.map(line => {
-        const [timestampStr, twrStr] = line.split(',');
-        const date = new Date(`${timestampStr}T13:30:00Z`).getTime();
-        const twr = Number(twrStr);
-        return { timestamp: date, twr, netWorth: initialCash };
-    }).filter(entry => Number.isFinite(entry.timestamp) && Number.isFinite(entry.twr));
-
-    return cachedTwrSeries;
-}
-
-function buildTwrSnapshots(initialCash: number, realizedPnl: number, twrSeries: TwrEntry[]) {
-    return twrSeries.map((entry, index) => {
-        const previous = index > 0 ? twrSeries[index - 1] : null;
-        const prevTwr = previous ? previous.twr : 0;
-        const dailyFactor = (1 + entry.twr) / (previous ? 1 + prevTwr : 1);
-        const dailyReturn = dailyFactor - 1;
-        return {
-            timestamp: entry.timestamp,
-            cash: initialCash,
-            positionsValue: 0,
-            netWorth: initialCash,
-            realizedPnl,
-            dailyReturn,
-            cumulativeReturn: entry.twr,
-            twr: entry.twr,
-        };
-    });
-}
-
-function buildTwrFactors(twrSeries: TwrEntry[]): number[] {
-    return twrSeries.map((entry, index) => {
-        const prev = index > 0 ? twrSeries[index - 1] : null;
-        const prevTwr = prev ? prev.twr : 0;
-        return (1 + entry.twr) / (prev ? 1 + prevTwr : 1);
-    }).slice(-1000);
 }
